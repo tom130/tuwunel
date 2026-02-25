@@ -195,7 +195,10 @@ where
 		.await
 		.inspect_err(|e| {
 			debug_warn!(
-				event_type = ?event.event_type(), ?state_key, %event_id,
+				%event_id,
+				sender = %event.sender(),
+				event_type = ?event.event_type(),
+				?state_key,
 				"event failed auth check: {e}"
 			);
 		})
