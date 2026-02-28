@@ -1,5 +1,6 @@
 #[cfg(unix)]
 use nix::sys::resource::{Resource, getrlimit};
+use nix::unistd::{SysconfVar, sysconf};
 
 use crate::{Result, apply, debug, utils::math::usize_from_u64_truncated};
 
@@ -51,6 +52,7 @@ pub fn maximize_thread_limit() -> Result {
 pub fn maximize_thread_limit() -> Result { Ok(()) }
 
 #[cfg(unix)]
+#[inline]
 pub fn max_file_descriptors() -> Result<(usize, usize)> {
 	getrlimit(Resource::RLIMIT_NOFILE)
 		.map(apply!(2, usize_from_u64_truncated))
@@ -58,9 +60,11 @@ pub fn max_file_descriptors() -> Result<(usize, usize)> {
 }
 
 #[cfg(not(unix))]
+#[inline]
 pub fn max_file_descriptors() -> Result<(usize, usize)> { Ok((usize::MAX, usize::MAX)) }
 
 #[cfg(unix)]
+#[inline]
 pub fn max_stack_size() -> Result<(usize, usize)> {
 	getrlimit(Resource::RLIMIT_STACK)
 		.map(apply!(2, usize_from_u64_truncated))
@@ -68,9 +72,11 @@ pub fn max_stack_size() -> Result<(usize, usize)> {
 }
 
 #[cfg(not(unix))]
+#[inline]
 pub fn max_stack_size() -> Result<(usize, usize)> { Ok((usize::MAX, usize::MAX)) }
 
 #[cfg(any(linux_android, netbsdlike, target_os = "freebsd",))]
+#[inline]
 pub fn max_memory_locked() -> Result<(usize, usize)> {
 	getrlimit(Resource::RLIMIT_MEMLOCK)
 		.map(apply!(2, usize_from_u64_truncated))
@@ -78,6 +84,7 @@ pub fn max_memory_locked() -> Result<(usize, usize)> {
 }
 
 #[cfg(not(any(linux_android, netbsdlike, target_os = "freebsd",)))]
+#[inline]
 pub fn max_memory_locked() -> Result<(usize, usize)> { Ok((usize::MIN, usize::MIN)) }
 
 #[cfg(any(
@@ -86,6 +93,7 @@ pub fn max_memory_locked() -> Result<(usize, usize)> { Ok((usize::MIN, usize::MI
 	target_os = "aix",
 	target_os = "freebsd",
 ))]
+#[inline]
 pub fn max_threads() -> Result<(usize, usize)> {
 	getrlimit(Resource::RLIMIT_NPROC)
 		.map(apply!(2, usize_from_u64_truncated))
@@ -98,4 +106,14 @@ pub fn max_threads() -> Result<(usize, usize)> {
 	target_os = "aix",
 	target_os = "freebsd",
 )))]
+#[inline]
 pub fn max_threads() -> Result<(usize, usize)> { Ok((usize::MAX, usize::MAX)) }
+
+/// Get the system's page size in bytes.
+#[inline]
+pub fn page_size() -> Result<usize> {
+	sysconf(SysconfVar::PAGE_SIZE)?
+		.unwrap_or(-1)
+		.try_into()
+		.map_err(Into::into)
+}

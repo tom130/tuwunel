@@ -331,3 +331,13 @@ fn cycle_counter() {
 	assert!(b > a, "b must happen after a");
 	assert!(c > 0, "c must be positive");
 }
+
+#[test]
+fn page_size() {
+	use crate::utils::sys::page_size;
+
+	let val = page_size().expect("Failed to get system page size");
+	println!("{val:?}");
+
+	assert!(val != 0, "page size was zero");
+}
