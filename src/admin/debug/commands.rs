@@ -22,6 +22,7 @@ use tuwunel_core::{
 		Event,
 		pdu::{PduEvent, PduId, RawPduId},
 	},
+	tokio_metrics::TaskMonitor,
 	trace, utils,
 	utils::{
 		stream::{IterStream, ReadyExt},
@@ -788,6 +789,37 @@ pub(super) async fn runtime_interval(&self) -> Result {
 pub(super) async fn runtime_interval(&self) -> Result {
 	self.write_str("Runtime metrics require building with `tokio_unstable`.")
 		.await
+}
+
+#[admin_command]
+pub(super) async fn task_metrics(&self) -> Result {
+	let out = self
+		.services
+		.server
+		.metrics
+		.task_metrics()
+		.map(TaskMonitor::cumulative)
+		.map_or_else(
+			|| "Task metrics are not available.".to_owned(),
+			|metrics| format!("```rs\n{metrics:#?}\n```"),
+		);
+
+	self.write_str(&out).await
+}
+
+#[admin_command]
+pub(super) async fn task_interval(&self) -> Result {
+	let out = self
+		.services
+		.server
+		.metrics
+		.task_interval()
+		.map_or_else(
+			|| "Task metrics are not available.".to_owned(),
+			|metrics| format!("```rs\n{metrics:#?}\n```"),
+		);
+
+	self.write_str(&out).await
 }
 
 #[admin_command]

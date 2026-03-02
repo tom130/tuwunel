@@ -20,6 +20,7 @@ pub use ::jsonwebtoken as jwt;
 pub use ::ruma;
 pub use ::smallstr;
 pub use ::smallvec;
+pub use ::tokio_metrics;
 pub use ::toml;
 pub use ::tracing;
 pub use config::Config;

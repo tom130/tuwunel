@@ -67,7 +67,7 @@ pub fn new(args: Option<&Args>, runtime: Option<&runtime::Handle>) -> Result<Arc
 	);
 
 	Ok(Arc::new(Self {
-		server: Arc::new(tuwunel_core::Server::new(config, runtime.cloned(), logger)),
+		server: Arc::new(tuwunel_core::Server::new(config, runtime, logger)),
 
 		services: None.into(),
 
