@@ -26,15 +26,16 @@ use crate::{
 #[cfg(feature = "jemalloc_conf")]
 #[unsafe(no_mangle)]
 pub static malloc_conf: &[u8] = const_str::concat_bytes!(
-	"lg_extent_max_active_fit:4",
-	",oversize_threshold:16777216",
-	",tcache_max:2097152",
-	",dirty_decay_ms:16000",
-	",muzzy_decay_ms:144000",
+	"tcache:true",
 	",percpu_arena:percpu",
 	",metadata_thp:always",
 	",background_thread:true",
 	",max_background_threads:-1",
+	",lg_extent_max_active_fit:4",
+	",oversize_threshold:2097152",
+	",tcache_max:524288",
+	",dirty_decay_ms:16000",
+	",muzzy_decay_ms:144000",
 	//MALLOC_CONF_PROF,
 	0
 );
