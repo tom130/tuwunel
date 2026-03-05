@@ -51,7 +51,7 @@ static VERSIONS: [&str; 17] = [
 	"v1.15",  /* custom profile fields */
 ];
 
-static UNSTABLE_FEATURES: [&str; 18] = [
+static UNSTABLE_FEATURES: [&str; 19] = [
 	"org.matrix.e2e_cross_signing",
 	// private read receipts (https://github.com/matrix-org/matrix-spec-proposals/pull/2285)
 	"org.matrix.msc2285.stable",
@@ -86,4 +86,6 @@ static UNSTABLE_FEATURES: [&str; 18] = [
 	"org.matrix.simplified_msc3575",
 	// Allow room moderators to view redacted event content (https://github.com/matrix-org/matrix-spec-proposals/pull/2815)
 	"fi.mau.msc2815",
+	// MatrixRTC transports (https://github.com/matrix-org/matrix-spec-proposals/pull/4143)
+	"org.matrix.msc4143",
 ];

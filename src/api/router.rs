@@ -156,6 +156,10 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 		.ruma_route(&client::get_message_events_route)
 		.ruma_route(&client::search_events_route)
 		.ruma_route(&client::turn_server_route)
+		.route(
+			"/_matrix/client/v1/rtc/transports",
+			get(client::get_rtc_transports_route),
+		)
 		.ruma_route(&client::send_event_to_device_route)
 		.ruma_route(&client::create_content_route)
 		.ruma_route(&client::get_content_thumbnail_route)
