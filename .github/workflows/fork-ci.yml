@@ -12,8 +12,10 @@ concurrency:
 
 jobs:
   build:
-    name: Build
+    name: Build & Push Image
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
     - uses: actions/checkout@v4
       with:
@@ -24,5 +26,18 @@ jobs:
 
     - uses: DeterminateSystems/magic-nix-cache-action@main
 
-    - name: nix build
-      run: nix build .#default --print-build-logs
+    - name: Build OCI image
+      run: nix build .#oci-image --print-build-logs
+
+    - name: Login to GHCR
+      if: github.event_name == 'push'
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+    - name: Load and push image
+      if: github.event_name == 'push'
+      run: |
+        docker load < result
+        IMAGE_ID=$(docker images --format '{{.ID}}' | head -1)
+        TAG="ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
+        docker tag "$IMAGE_ID" "$TAG"
+        docker push "$TAG"
