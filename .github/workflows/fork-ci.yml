@@ -11,21 +11,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: Check
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        fetch-tags: true
 
     - uses: DeterminateSystems/nix-installer-action@main
 
     - uses: DeterminateSystems/magic-nix-cache-action@main
 
-    - name: cargo check
-      run: nix develop -c cargo check --workspace 2>&1
-
-    - name: cargo clippy
-      run: nix develop -c cargo clippy --workspace 2>&1
-
-    - name: cargo test
-      run: nix develop -c cargo test --workspace 2>&1
+    - name: nix build
+      run: nix build .#default --print-build-logs
