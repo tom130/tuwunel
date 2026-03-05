@@ -34,10 +34,11 @@ jobs:
 
     - name: Build and push Docker image
       run: |
+        cp result/bin/tuwunel tuwunel-bin
         cat > Dockerfile.fork <<'DOCKERFILE'
         FROM debian:testing-slim
         RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates && rm -rf /var/lib/apt/lists/*
-        COPY result/bin/tuwunel /usr/local/bin/tuwunel
+        COPY tuwunel-bin /usr/local/bin/tuwunel
         ENTRYPOINT ["tini", "--"]
         CMD ["tuwunel"]
         DOCKERFILE
