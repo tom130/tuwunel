@@ -58,7 +58,7 @@
             inherit inputs;
             main = self.callPackage ./nix/pkgs/main { };
             oci-image = self.callPackage ./nix/pkgs/oci-image { };
-            tini = pkgs.tini.overrideAttrs {
+            tini = pkgs.tini.overrideAttrs (old: {
               # newer clang/gcc is unhappy with tini-static: <https://3.dog/~strawberry/pb/c8y4>
               patches = [
                 (pkgs.fetchpatch {
@@ -66,7 +66,11 @@
                   hash = "sha256-4bTfAhRyIT71VALhHY13hUgbjLEUyvgkIJMt3w9ag3k=";
                 })
               ];
-            };
+              # CMake >= 4.0 removed compatibility with cmake_minimum_required < 3.5
+              cmakeFlags = (old.cmakeFlags or []) ++ [
+                "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+              ];
+            });
             liburing = pkgs.liburing.overrideAttrs {
               # Tests weren't building
               outputs = [
