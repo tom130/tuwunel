@@ -24,8 +24,17 @@ jobs:
         fetch-tags: true
 
     - uses: DeterminateSystems/nix-installer-action@main
+      with:
+        extra-conf: |
+          extra-platforms = aarch64-linux
+          sandbox = false
 
     - uses: DeterminateSystems/magic-nix-cache-action@main
+
+    - name: Set up QEMU for aarch64
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: arm64
 
     - name: Build aarch64 static binary
       run: nix build .#static-aarch64-linux-musl --print-build-logs
