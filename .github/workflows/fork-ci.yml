@@ -14,7 +14,7 @@ concurrency:
 jobs:
   build:
     name: Build & Push Image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-arm
     permissions:
       packages: write
     steps:
@@ -26,18 +26,12 @@ jobs:
     - uses: DeterminateSystems/nix-installer-action@main
       with:
         extra-conf: |
-          extra-platforms = aarch64-linux
           sandbox = false
 
     - uses: DeterminateSystems/magic-nix-cache-action@main
 
-    - name: Set up QEMU for aarch64
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: arm64
-
-    - name: Build aarch64 static binary
-      run: nix build .#static-aarch64-linux-musl --print-build-logs
+    - name: Build binary
+      run: nix build .#default --print-build-logs
 
     - name: Login to GHCR
       run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
@@ -46,12 +40,12 @@ jobs:
       run: |
         cp result/bin/tuwunel tuwunel-bin
         cat > Dockerfile.fork <<'DOCKERFILE'
-        FROM arm64v8/debian:testing-slim
+        FROM debian:testing-slim
         RUN apt-get update && apt-get install -y --no-install-recommends tini ca-certificates && rm -rf /var/lib/apt/lists/*
         COPY tuwunel-bin /usr/local/bin/tuwunel
         ENTRYPOINT ["tini", "--"]
         CMD ["tuwunel"]
         DOCKERFILE
         TAG="ghcr.io/${{ github.repository }}:${{ github.ref_name }}"
-        docker buildx create --use
-        docker buildx build --platform linux/arm64 -f Dockerfile.fork -t "$TAG" --push .
+        docker build -f Dockerfile.fork -t "$TAG" .
+        docker push "$TAG"
