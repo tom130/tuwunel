@@ -160,6 +160,10 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 			"/_matrix/client/v1/rtc/transports",
 			get(client::get_rtc_transports_route),
 		)
+		.route(
+			"/_matrix/client/unstable/org.matrix.msc4143/rtc/transports",
+			get(client::get_rtc_transports_route),
+		)
 		.ruma_route(&client::send_event_to_device_route)
 		.ruma_route(&client::create_content_route)
 		.ruma_route(&client::get_content_thumbnail_route)
