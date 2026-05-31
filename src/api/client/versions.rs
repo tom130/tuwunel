@@ -51,7 +51,7 @@ static VERSIONS: [&str; 17] = [
 	"v1.15",  /* custom profile fields */
 ];
 
-static UNSTABLE_FEATURES: [&str; 19] = [
+static UNSTABLE_FEATURES: [&str; 23] = [
 	"org.matrix.e2e_cross_signing",
 	// private read receipts (https://github.com/matrix-org/matrix-spec-proposals/pull/2285)
 	"org.matrix.msc2285.stable",
@@ -88,4 +88,29 @@ static UNSTABLE_FEATURES: [&str; 19] = [
 	"fi.mau.msc2815",
 	// MatrixRTC transports (https://github.com/matrix-org/matrix-spec-proposals/pull/4143)
 	"org.matrix.msc4143",
+	// QR-code login rendezvous (https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+	"org.matrix.msc4108",
+	// Next-generation auth discovery (https://github.com/matrix-org/matrix-spec-proposals/pull/2965)
+	"org.matrix.msc2965",
+	// Next-generation auth dynamic client registration
+	"org.matrix.msc2966",
+	// Next-generation auth scopes
+	"org.matrix.msc2967",
 ];
+
+#[cfg(test)]
+mod tests {
+	use super::UNSTABLE_FEATURES;
+
+	#[test]
+	fn versions_advertise_next_gen_auth_unstable_features() {
+		for feature in [
+			"org.matrix.msc4108",
+			"org.matrix.msc2965",
+			"org.matrix.msc2966",
+			"org.matrix.msc2967",
+		] {
+			assert!(UNSTABLE_FEATURES.contains(&feature), "missing {feature}");
+		}
+	}
+}

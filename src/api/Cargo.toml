@@ -101,5 +101,8 @@ tuwunel-core.workspace = true
 tuwunel-service.workspace = true
 url.workspace = true
 
+[dev-dependencies]
+tower.workspace = true
+
 [lints]
 workspace = true

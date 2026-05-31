@@ -164,6 +164,38 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 			"/_matrix/client/unstable/org.matrix.msc4143/rtc/transports",
 			get(client::get_rtc_transports_route),
 		)
+		.route(
+			"/_matrix/client/unstable/org.matrix.msc4108/rendezvous",
+			post(client::create_rendezvous_session_route),
+		)
+		.route(
+			"/_matrix/client/unstable/org.matrix.msc4108/rendezvous/{session_id}",
+			get(client::get_rendezvous_session_route)
+				.put(client::update_rendezvous_session_route)
+				.delete(client::delete_rendezvous_session_route),
+		)
+		.route(
+			"/_tuwunel/oauth/register",
+			post(client::register_oauth_client_route),
+		)
+		.route(
+			"/_matrix/client/v1/auth_metadata",
+			get(client::get_auth_metadata_route),
+		)
+		.route(
+			"/_matrix/client/unstable/org.matrix.msc2965/auth_metadata",
+			get(client::get_auth_metadata_route),
+		)
+		.route(
+			"/_tuwunel/oauth/device",
+			post(client::device_authorization_route),
+		)
+		.route(
+			"/_tuwunel/oauth/link",
+			get(client::get_oauth_link_route).post(client::post_oauth_link_route),
+		)
+		.route("/_tuwunel/oauth/token", post(client::oauth_token_route))
+		.route("/_tuwunel/oauth/revoke", post(client::oauth_revoke_route))
 		.ruma_route(&client::send_event_to_device_route)
 		.ruma_route(&client::create_content_route)
 		.ruma_route(&client::get_content_thumbnail_route)
@@ -201,7 +233,7 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 			get(client::get_room_summary_legacy)
 		)
 		.ruma_route(&client::well_known_support)
-		.ruma_route(&client::well_known_client)
+		.route("/.well-known/matrix/client", get(client::well_known_client))
 		.route("/_tuwunel/server_version", get(client::tuwunel_server_version))
 		.ruma_route(&client::room_initial_sync_route)
 		.route("/client/server.json", get(client::syncv3_client_server_json));

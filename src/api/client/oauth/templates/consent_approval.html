@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Confirm QR login</title>
+	<style>
+		body { margin: 0; font: 16px/1.45 system-ui, sans-serif; color: #1f2328; background: #f6f8fa; }
+		main { max-width: 30rem; margin: 8vh auto; padding: 2rem; background: #fff; border: 1px solid #d0d7de; border-radius: 8px; }
+		h1 { margin: 0 0 1rem; font-size: 1.5rem; }
+		dl { display: grid; grid-template-columns: 7rem 1fr; gap: .5rem 1rem; }
+		dt { color: #57606a; }
+		dd { margin: 0; overflow-wrap: anywhere; }
+		.actions { display: flex; gap: .75rem; margin-top: 1.25rem; }
+		button { flex: 1; padding: .7rem .9rem; border: 0; border-radius: 6px; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+		.approve { background: #1a7f37; }
+		.deny { background: #cf222e; }
+	</style>
+</head>
+<body>
+	<main>
+		<h1>Confirm QR login</h1>
+		<dl>
+			<dt>User</dt><dd>{{USER_ID}}</dd>
+			<dt>Code</dt><dd>{{USER_CODE}}</dd>
+			<dt>Device</dt><dd>{{DEVICE_ID}}</dd>
+			<dt>Access</dt><dd>{{SCOPE}}</dd>
+		</dl>
+		<form method="post" action="/_tuwunel/oauth/link">
+			<input type="hidden" name="user_code" value="{{USER_CODE}}">
+			<input type="hidden" name="csrf" value="{{CSRF_TOKEN}}">
+			<div class="actions">
+				<button class="deny" type="submit" name="action" value="deny">Deny</button>
+				<button class="approve" type="submit" name="action" value="approve">Approve</button>
+			</div>
+		</form>
+	</main>
+</body>
+</html>

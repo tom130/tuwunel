@@ -9,21 +9,24 @@ mod token;
 
 use axum::extract::State;
 use axum_client_ip::InsecureClientIp;
-use ruma::api::client::session::{
-	get_login_types::{
-		self,
-		v3::{
-			ApplicationServiceLoginType, IdentityProvider, JwtLoginType, LoginType,
-			PasswordLoginType, SsoLoginType, TokenLoginType,
+use ruma::{
+	OwnedUserId, UserId,
+	api::client::session::{
+		get_login_types::{
+			self,
+			v3::{
+				ApplicationServiceLoginType, IdentityProvider, JwtLoginType, LoginType,
+				PasswordLoginType, SsoLoginType, TokenLoginType,
+			},
+		},
+		login::{
+			self,
+			v3::{DiscoveryInfo, HomeserverInfo, LoginInfo},
 		},
 	},
-	login::{
-		self,
-		v3::{DiscoveryInfo, HomeserverInfo, LoginInfo},
-	},
 };
-use tuwunel_core::{Err, Result, info, utils::stream::ReadyExt};
-use tuwunel_service::users::device::generate_refresh_token;
+use tuwunel_core::{Err, Result, err, info, utils::stream::ReadyExt};
+use tuwunel_service::{Services, users::device::generate_refresh_token};
 
 use self::{ldap::ldap_login, password::password_login};
 pub(crate) use self::{
@@ -34,6 +37,34 @@ pub(crate) use self::{
 };
 use super::TOKEN_LENGTH;
 use crate::Ruma;
+
+pub(crate) async fn authenticate_password_login(
+	services: &Services,
+	username: &str,
+	password: &str,
+) -> Result<OwnedUserId> {
+	let user_id = UserId::parse_with_server_name(username, &services.config.server_name)
+		.map_err(|e| err!(Request(InvalidUsername(warn!("Username is invalid: {e}")))))?;
+	let lowercased_user_id = UserId::parse_with_server_name(
+		user_id.localpart().to_lowercase(),
+		&services.config.server_name,
+	)?;
+
+	let user_is_remote = !services.globals.user_is_local(&user_id)
+		|| !services
+			.globals
+			.user_is_local(&lowercased_user_id);
+
+	if user_is_remote {
+		return Err!(Request(Unknown("User ID does not belong to this homeserver")));
+	}
+
+	if cfg!(feature = "ldap") && services.config.ldap.enable {
+		ldap_login(services, &user_id, &lowercased_user_id, password).await
+	} else {
+		password_login(services, &user_id, &lowercased_user_id, password).await
+	}
+}
 
 /// # `GET /_matrix/client/v3/login`
 ///

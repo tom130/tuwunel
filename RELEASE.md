@@ -4,6 +4,11 @@ January 31, 2025
 
 ### New Features & Enhancements
 
+- Experimental Matrix QR-code login support is available behind the
+  `next_gen_auth` configuration gate. This adds MSC4108 rendezvous transport,
+  Matrix OAuth discovery, dynamic client registration, device-code approval,
+  native token issuance, refresh, and revocation endpoints for QR login flows.
+
 - SSO/OIDC support. This feature allows users to register and login via authorizations from OIDC Identity Providers. For example, you can now use your GitHub account to register on the server. Tuwunel implements the OIDC client protocol directly. This is referred to as "legacy SSO" in the Matrix specification; Matrix client support is widespread. Credit to @samip5 for opening the feature-issue (#7), the most 👍 feature of the project.
 
 - [MSC2815](https://github.com/matrix-org/matrix-spec-proposals/pull/2815) has been implemented, allowing configurable redacted event retention and retrieval by room admins. The content of redacted events is persisted for sixty days by default. Redacted events can be viewed using Gomuks.

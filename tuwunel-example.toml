@@ -835,6 +835,48 @@
 #
 #access_token_ttl = 604800
 
+# Enable experimental next-generation Matrix authentication endpoints.
+#
+# This gates MSC4108 QR-code login rendezvous endpoints and the OAuth
+# authorization-server endpoints used by that flow. It is disabled by
+# default so existing deployments are unaffected.
+#
+#next_gen_auth = false
+
+# MSC4108 rendezvous session TTL in seconds.
+#
+#rendezvous_ttl_secs = 60
+
+# MSC4108 rendezvous soft capacity. When the store reaches twice this
+# many sessions, expired and then oldest sessions are evicted until the
+# store is below this value.
+#
+#rendezvous_max_sessions = 100
+
+# Maximum MSC4108 rendezvous payload size in bytes.
+#
+#rendezvous_max_bytes = 4096
+
+# Maximum MSC4108 rendezvous requests accepted per minute.
+#
+# This is a coarse global limiter for the unauthenticated rendezvous
+# endpoint.
+#
+#rendezvous_rate_limit_per_minute = 600
+
+# OAuth device-authorization grant lifetime in seconds.
+#
+#device_grant_expires_secs = 600
+
+# OAuth device-authorization polling interval in seconds.
+#
+#device_grant_interval_secs = 5
+
+# Browser consent session lifetime in seconds for next-generation
+# authentication approvals.
+#
+#consent_session_ttl_secs = 600
+
 # Static TURN username to provide the client if not using a shared secret
 # ("turn_secret"), It is recommended to use a shared secret over static
 # credentials.

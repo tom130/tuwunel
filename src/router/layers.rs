@@ -154,10 +154,12 @@ fn cors_layer(server: &Server) -> CorsLayer {
 		Method::PUT,
 	];
 
-	let headers: [HeaderName; 5] = [
+	let headers: [HeaderName; 7] = [
 		header::ACCEPT,
 		header::AUTHORIZATION,
 		header::CONTENT_TYPE,
+		header::IF_MATCH,
+		header::IF_NONE_MATCH,
 		header::ORIGIN,
 		HeaderName::from_lowercase(b"x-requested-with").unwrap(),
 	];
@@ -184,6 +186,7 @@ fn cors_layer(server: &Server) -> CorsLayer {
 		.max_age(Duration::from_secs(86400))
 		.allow_methods(METHODS)
 		.allow_headers(headers)
+		.expose_headers([header::ETAG])
 		.allow_origin(allow_origin)
 }
 

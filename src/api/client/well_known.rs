@@ -1,9 +1,6 @@
 use axum::{Json, extract::State, response::IntoResponse};
-use ruma::api::client::discovery::{
-	discover_homeserver::{self, HomeserverInfo, RtcFocusInfo},
-	discover_support::{self, Contact},
-};
-use serde_json::Value as JsonValue;
+use ruma::api::client::discovery::discover_support::{self, Contact};
+use serde_json::{Value as JsonValue, json};
 use tuwunel_core::{Err, Result, err, error::inspect_log};
 
 use crate::Ruma;
@@ -14,13 +11,10 @@ use crate::Ruma;
 /// Also includes RTC transport configuration for Element Call (MSC4143).
 pub(crate) async fn well_known_client(
 	State(services): State<crate::State>,
-	_body: Ruma<discover_homeserver::Request>,
-) -> Result<discover_homeserver::Response> {
-	let homeserver = HomeserverInfo {
-		base_url: match services.server.config.well_known.client.as_ref() {
-			| Some(url) => url.to_string(),
-			| None => return Err!(Request(NotFound("Not found."))),
-		},
+) -> Result<impl IntoResponse> {
+	let homeserver_url = match services.server.config.well_known.client.as_ref() {
+		| Some(url) => url.to_string(),
+		| None => return Err!(Request(NotFound("Not found."))),
 	};
 
 	// Add RTC transport configuration if available (MSC4143 / Element Call)
@@ -33,17 +27,16 @@ pub(crate) async fn well_known_client(
 		.rtc_transports
 		.iter()
 		.map(|transport| {
-			let focus_type = transport
+			transport
 				.get("type")
 				.and_then(JsonValue::as_str)
 				.ok_or_else(|| err!("`type` is not a valid string"))?;
 
-			let transport = transport
+			transport
 				.as_object()
-				.cloned()
 				.ok_or_else(|| err!("`rtc_transport` is not a valid object"))?;
 
-			RtcFocusInfo::new(focus_type, transport).map_err(Into::into)
+			Ok(transport.clone())
 		})
 		.collect::<Result<_>>()
 		.map_err(|e| {
@@ -51,10 +44,13 @@ pub(crate) async fn well_known_client(
 		})
 		.inspect_err(inspect_log)?;
 
-	Ok(discover_homeserver::Response {
-		rtc_foci,
-		..discover_homeserver::Response::new(homeserver)
-	})
+	let authentication_issuer = services
+		.server
+		.config
+		.next_gen_auth
+		.then(|| public_base_url(services));
+
+	Ok(Json(well_known_client_body(&homeserver_url, rtc_foci, authentication_issuer)))
 }
 
 /// # `GET /.well-known/matrix/support`
@@ -139,4 +135,66 @@ pub(crate) async fn syncv3_client_server_json(
 		"server": server_url,
 		"version": tuwunel_core::version(),
 	})))
+}
+
+fn well_known_client_body(
+	homeserver_url: &str,
+	rtc_foci: Vec<JsonValue>,
+	authentication_issuer: Option<String>,
+) -> JsonValue {
+	let mut body = json!({
+		"m.homeserver": {
+			"base_url": homeserver_url,
+		},
+	});
+	let object = body
+		.as_object_mut()
+		.expect("well-known body is a JSON object");
+
+	if !rtc_foci.is_empty() {
+		object.insert("org.matrix.msc4143.rtc_foci".into(), rtc_foci.into());
+	}
+
+	if let Some(issuer) = authentication_issuer {
+		object.insert("m.authentication".into(), json!({ "issuer": issuer }));
+	}
+
+	body
+}
+
+fn public_base_url(services: crate::State) -> String {
+	services
+		.server
+		.config
+		.well_known
+		.client
+		.as_ref()
+		.map(ToString::to_string)
+		.unwrap_or_else(|| format!("https://{}", services.server.name))
+		.trim_end_matches('/')
+		.to_owned()
+}
+
+#[cfg(test)]
+mod tests {
+	use super::well_known_client_body;
+
+	#[test]
+	fn well_known_client_body_includes_authentication_when_enabled() {
+		let body = well_known_client_body(
+			"https://hs.example",
+			Vec::new(),
+			Some("https://hs.example".into()),
+		);
+
+		assert_eq!(body["m.homeserver"]["base_url"], "https://hs.example");
+		assert_eq!(body["m.authentication"]["issuer"], "https://hs.example");
+	}
+
+	#[test]
+	fn well_known_client_body_omits_authentication_when_disabled() {
+		let body = well_known_client_body("https://hs.example", Vec::new(), None);
+
+		assert!(body.get("m.authentication").is_none());
+	}
 }

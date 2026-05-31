@@ -1015,6 +1015,64 @@ pub struct Config {
 	#[serde(default = "default_access_token_ttl")]
 	pub access_token_ttl: u64,
 
+	/// Enable experimental next-generation Matrix authentication endpoints.
+	///
+	/// This gates MSC4108 QR-code login rendezvous endpoints and the OAuth
+	/// authorization-server endpoints used by that flow. It is disabled by
+	/// default so existing deployments are unaffected.
+	///
+	/// default: false
+	#[serde(default)]
+	pub next_gen_auth: bool,
+
+	/// MSC4108 rendezvous session TTL in seconds.
+	///
+	/// default: 60
+	#[serde(default = "default_rendezvous_ttl_secs")]
+	pub rendezvous_ttl_secs: u64,
+
+	/// MSC4108 rendezvous soft capacity. When the store reaches twice this
+	/// many sessions, expired and then oldest sessions are evicted until the
+	/// store is below this value.
+	///
+	/// default: 100
+	#[serde(default = "default_rendezvous_max_sessions")]
+	pub rendezvous_max_sessions: usize,
+
+	/// Maximum MSC4108 rendezvous payload size in bytes.
+	///
+	/// default: 4096
+	#[serde(default = "default_rendezvous_max_bytes")]
+	pub rendezvous_max_bytes: usize,
+
+	/// Maximum MSC4108 rendezvous requests accepted per minute.
+	///
+	/// This is a coarse global limiter for the unauthenticated rendezvous
+	/// endpoint.
+	///
+	/// default: 600
+	#[serde(default = "default_rendezvous_rate_limit_per_minute")]
+	pub rendezvous_rate_limit_per_minute: usize,
+
+	/// OAuth device-authorization grant lifetime in seconds.
+	///
+	/// default: 600
+	#[serde(default = "default_device_grant_expires_secs")]
+	pub device_grant_expires_secs: u64,
+
+	/// OAuth device-authorization polling interval in seconds.
+	///
+	/// default: 5
+	#[serde(default = "default_device_grant_interval_secs")]
+	pub device_grant_interval_secs: u64,
+
+	/// Browser consent session lifetime in seconds for next-generation
+	/// authentication approvals.
+	///
+	/// default: 600
+	#[serde(default = "default_consent_session_ttl_secs")]
+	pub consent_session_ttl_secs: u64,
+
 	/// Static TURN username to provide the client if not using a shared secret
 	/// ("turn_secret"), It is recommended to use a shared secret over static
 	/// credentials.
@@ -3305,6 +3363,20 @@ fn default_openid_token_ttl() -> u64 { 60 * 60 }
 fn default_login_token_ttl() -> u64 { 2 * 60 * 1000 }
 
 fn default_turn_ttl() -> u64 { 60 * 60 * 24 }
+
+fn default_rendezvous_ttl_secs() -> u64 { 60 }
+
+fn default_rendezvous_max_sessions() -> usize { 100 }
+
+fn default_rendezvous_max_bytes() -> usize { 4096 }
+
+fn default_rendezvous_rate_limit_per_minute() -> usize { 600 }
+
+fn default_device_grant_expires_secs() -> u64 { 600 }
+
+fn default_device_grant_interval_secs() -> u64 { 5 }
+
+fn default_consent_session_ttl_secs() -> u64 { 600 }
 
 fn default_presence_idle_timeout_s() -> u64 { 5 * 60 }
 

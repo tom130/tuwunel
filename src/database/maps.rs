@@ -137,6 +137,10 @@ pub(super) static MAPS: &[Descriptor] = &[
 		..descriptor::RANDOM_SMALL
 	},
 	Descriptor {
+		name: "oauthclient_metadata",
+		..descriptor::RANDOM_SMALL
+	},
+	Descriptor {
 		name: "oauthuniqid_oauthid",
 		..descriptor::RANDOM_SMALL
 	},

@@ -1,10 +1,6 @@
 use std::time::SystemTime;
 
-use axum::{
-	Json,
-	extract::State,
-	response::IntoResponse,
-};
+use axum::{Json, extract::State, response::IntoResponse};
 use axum_extra::{
 	TypedHeader,
 	headers::{Authorization, authorization::Bearer},
@@ -49,7 +45,11 @@ pub(crate) async fn get_rtc_transports_route(
 	match services.users.find_from_token(token).await {
 		| Ok((user_id, device_id, expires_at)) => {
 			if expires_at.is_some_and(is_less_than!(SystemTime::now())) {
-				services.users.remove_access_token(&user_id, &device_id).await.ok();
+				services
+					.users
+					.remove_access_token(&user_id, &device_id)
+					.await
+					.ok();
 				return Err(Error::BadRequest(
 					ErrorKind::UnknownToken { soft_logout: true },
 					"Expired access token.",

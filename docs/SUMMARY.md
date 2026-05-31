@@ -17,6 +17,7 @@
   - [FreeBSD](deploying/freebsd.md)
 - [TURN](turn.md)
 - [Matrix RTC (Element Call)](matrix_rtc.md)
+- [QR Login](qr_login.md)
 - [Appservices](appservices.md)
 - [Maintenance](maintenance.md)
 - [Troubleshooting](troubleshooting.md)
