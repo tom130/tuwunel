@@ -1,28 +1,22 @@
-use axum::{
-	extract::State,
-	response::{Html, IntoResponse, Response},
-};
-use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
+use axum::{extract::State, response::Response};
+use axum_extra::extract::cookie::CookieJar;
 use bytes::Bytes;
-use http::{
-	HeaderValue, StatusCode, Uri,
-	header::{CACHE_CONTROL, SET_COOKIE},
-};
+use http::{StatusCode, Uri};
 use ruma::{OwnedUserId, api::client::error::ErrorKind};
 use serde::Deserialize;
 use tuwunel_core::{Err, Error, Result, err};
 use tuwunel_service::oauth_provider::{
-	consent::{BrowserSession, CreatedSession},
+	consent::BrowserSession,
 	grants::{GrantStatus, PendingGrant},
 };
-use url::Url;
 
-const CONSENT_COOKIE: &str = "tuwunel_oauth_consent";
-const CONSENT_COOKIE_PATH: &str = "/_tuwunel/oauth";
+use super::web::{
+	append_consent_cookie, consent_session_from_cookie, escape_html, html_response,
+	message_response, public_base_url, sso_provider_links,
+};
 
 const LOGIN_TEMPLATE: &str = include_str!("templates/consent_login.html");
 const CONSENT_TEMPLATE: &str = include_str!("templates/consent_approval.html");
-const MESSAGE_TEMPLATE: &str = include_str!("templates/consent_message.html");
 
 #[derive(Deserialize)]
 struct LinkQuery {
@@ -108,7 +102,10 @@ pub(crate) async fn get_oauth_link_route(
 	};
 
 	let base_url = public_base_url(services);
-	let sso_links = sso_provider_links(services, &base_url, user_code)?;
+	let sso_links = sso_provider_links(services, &base_url, "/_tuwunel/oauth/link", &[(
+		"user_code",
+		user_code,
+	)])?;
 	let mut response = link_page_response(&grant, session.as_ref(), &sso_links);
 
 	if let Some(created) = created_session.as_ref() {
@@ -213,7 +210,10 @@ async fn password_login_response(
 		.create(user_id)
 		.await;
 	let base_url = public_base_url(*services);
-	let sso_links = sso_provider_links(*services, &base_url, &form.user_code)?;
+	let sso_links = sso_provider_links(*services, &base_url, "/_tuwunel/oauth/link", &[(
+		"user_code",
+		form.user_code.as_str(),
+	)])?;
 	let mut response = link_page_response(grant, Some(&created.session), &sso_links);
 	append_consent_cookie(&mut response, &created, base_url.starts_with("https://"))?;
 
@@ -239,19 +239,6 @@ fn validated_consent_decision(
 		user_code: form.user_code.clone(),
 		user_id: session.user_id.clone(),
 	})
-}
-
-async fn consent_session_from_cookie(
-	services: &crate::State,
-	jar: &CookieJar,
-) -> Option<BrowserSession> {
-	let session_id = jar.get(CONSENT_COOKIE)?.value();
-	services
-		.oauth_provider
-		.consent
-		.get(session_id)
-		.await
-		.ok()
 }
 
 fn link_page_response(
@@ -315,98 +302,12 @@ fn user_code_error_response(status: StatusCode) -> Response {
 	)
 }
 
-fn message_response(status: StatusCode, title: &str, message: &str) -> Response {
-	let body = MESSAGE_TEMPLATE
-		.replace("{{TITLE}}", &escape_html(title))
-		.replace("{{MESSAGE}}", &escape_html(message));
-
-	html_response(status, body)
-}
-
-fn html_response(status: StatusCode, body: String) -> Response {
-	let mut response = (status, Html(body)).into_response();
-	response
-		.headers_mut()
-		.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-	response
-}
-
-fn append_consent_cookie(
-	response: &mut Response,
-	created: &CreatedSession,
-	secure: bool,
-) -> Result {
-	let cookie = Cookie::build((CONSENT_COOKIE, created.session_id.clone()))
-		.path(CONSENT_COOKIE_PATH)
-		.http_only(true)
-		.same_site(SameSite::Lax)
-		.secure(secure)
-		.build()
-		.to_string();
-	let cookie = HeaderValue::from_str(&cookie)?;
-	response.headers_mut().append(SET_COOKIE, cookie);
-
-	Ok(())
-}
-
-fn sso_provider_links(services: crate::State, base_url: &str, user_code: &str) -> Result<String> {
-	let mut links = Vec::new();
-
-	for provider in services.config.identity_provider.values() {
-		let idp_id = provider.id();
-		let name = provider
-			.name
-			.as_deref()
-			.unwrap_or(provider.brand.as_str());
-		let mut redirect_url = Url::parse(&format!("{base_url}/_tuwunel/oauth/link"))?;
-		redirect_url
-			.query_pairs_mut()
-			.append_pair("user_code", user_code);
-
-		let mut sso_url =
-			Url::parse(&format!("{base_url}/_matrix/client/v3/login/sso/redirect/{idp_id}",))?;
-		sso_url
-			.query_pairs_mut()
-			.append_pair("redirectUrl", redirect_url.as_str());
-
-		links.push(format!(
-			"<a class=\"sso\" href=\"{}\">Sign in with {}</a>",
-			escape_html(sso_url.as_str()),
-			escape_html(name),
-		));
-	}
-
-	Ok(links.join("\n"))
-}
-
 fn human_scope(grant: &PendingGrant) -> String {
 	format!("Matrix client API for device {}", grant.device_id)
 }
 
-fn public_base_url(services: crate::State) -> String {
-	services
-		.server
-		.config
-		.well_known
-		.client
-		.as_ref()
-		.map(ToString::to_string)
-		.unwrap_or_else(|| format!("https://{}", services.server.name))
-		.trim_end_matches('/')
-		.to_owned()
-}
-
 fn consent_disabled_error() -> Error {
 	Error::Request(ErrorKind::Unrecognized, "Unrecognized request.".into(), StatusCode::NOT_FOUND)
-}
-
-fn escape_html(value: &str) -> String {
-	value
-		.replace('&', "&amp;")
-		.replace('<', "&lt;")
-		.replace('>', "&gt;")
-		.replace('"', "&quot;")
-		.replace('\'', "&#39;")
 }
 
 #[cfg(test)]

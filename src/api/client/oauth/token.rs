@@ -13,12 +13,16 @@ use serde::Deserialize;
 use serde_json::json;
 use tuwunel_core::{Error, Result};
 use tuwunel_service::{
-	oauth_provider::grants::{GrantPoll, GrantStatus, PendingGrant},
+	oauth_provider::{
+		grants::{GrantPoll, GrantStatus, PendingGrant},
+		pkce, redirect,
+	},
 	users::device::generate_refresh_token,
 };
 
 const DEVICE_CODE_GRANT_TYPE: &str = "urn:ietf:params:oauth:grant-type:device_code";
 const REFRESH_TOKEN_GRANT_TYPE: &str = "refresh_token";
+const AUTHORIZATION_CODE_GRANT_TYPE: &str = "authorization_code";
 
 #[derive(Debug, Deserialize)]
 struct TokenRequest {
@@ -26,6 +30,9 @@ struct TokenRequest {
 	device_code: Option<String>,
 	client_id: Option<String>,
 	refresh_token: Option<String>,
+	code: Option<String>,
+	redirect_uri: Option<String>,
+	code_verifier: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +45,14 @@ struct DeviceTokenRequest {
 struct RefreshTokenRequest {
 	grant_type: String,
 	refresh_token: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct AuthorizationCodeTokenRequest {
+	code: String,
+	redirect_uri: String,
+	client_id: String,
+	code_verifier: String,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -99,6 +114,24 @@ pub(crate) async fn oauth_token_route(
 			})
 			.await
 		},
+		| AUTHORIZATION_CODE_GRANT_TYPE => {
+			let (Some(code), Some(redirect_uri), Some(client_id), Some(code_verifier)) =
+				(request.code, request.redirect_uri, request.client_id, request.code_verifier)
+			else {
+				return Ok(oauth_token_error_response(
+					StatusCode::BAD_REQUEST,
+					"invalid_request",
+				));
+			};
+
+			authorization_code_token_grant(services, AuthorizationCodeTokenRequest {
+				code,
+				redirect_uri,
+				client_id,
+				code_verifier,
+			})
+			.await
+		},
 		| _ => Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "unsupported_grant_type")),
 	}
 }
@@ -131,10 +164,12 @@ async fn device_code_token_grant(
 
 	let grant = match poll {
 		| GrantPoll::Ready(grant) => *grant,
-		| GrantPoll::SlowDown { .. } =>
-			return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "slow_down")),
-		| GrantPoll::Expired =>
-			return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "expired_token")),
+		| GrantPoll::SlowDown { .. } => {
+			return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "slow_down"));
+		},
+		| GrantPoll::Expired => {
+			return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "expired_token"));
+		},
 	};
 
 	let approved = match approved_grant_for_issuance(&request, grant) {
@@ -159,7 +194,56 @@ async fn device_code_token_grant(
 		| Err(error) => return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, error)),
 	};
 
-	let issue = issue_native_token(services, approved).await?;
+	let issue = issue_native_token(services, approved, "QR login").await?;
+
+	Ok(token_success_response(&issue))
+}
+
+async fn authorization_code_token_grant(
+	services: crate::State,
+	request: AuthorizationCodeTokenRequest,
+) -> Result<Response> {
+	match services
+		.oauth_provider
+		.clients
+		.get(&request.client_id)
+		.await
+	{
+		| Ok(_) => {},
+		| Err(error) if error.is_not_found() => {
+			return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "invalid_client"));
+		},
+		| Err(error) => return Err(error),
+	}
+
+	let Ok(code) = services
+		.oauth_provider
+		.authorize
+		.codes
+		.consume(&request.code)
+		.await
+	else {
+		return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "invalid_grant"));
+	};
+
+	if code.client_id != request.client_id
+		|| !redirect::redirect_uri_matches(&code.redirect_uri, &request.redirect_uri)
+		|| !pkce::verify_s256(&request.code_verifier, &code.code_challenge)
+	{
+		return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "invalid_grant"));
+	}
+
+	let approved = ApprovedDeviceGrant {
+		user_id: code.user_id,
+		device_id: OwnedDeviceId::from(code.device_id),
+		scope: code.granted_scope.to_string(),
+	};
+
+	if device_id_owned_by_other_user(services, &approved.user_id, &approved.device_id).await {
+		return Ok(oauth_token_error_response(StatusCode::BAD_REQUEST, "device_already_exists"));
+	}
+
+	let issue = issue_native_token(services, approved, "OAuth login").await?;
 
 	Ok(token_success_response(&issue))
 }
@@ -233,6 +317,7 @@ fn approved_grant_for_issuance(
 async fn issue_native_token(
 	services: crate::State,
 	approved: ApprovedDeviceGrant,
+	initial_device_display_name: &str,
 ) -> Result<TokenIssue> {
 	let refresh_token = generate_refresh_token();
 	let (access_token, expires_in) = services.users.generate_access_token(true);
@@ -261,7 +346,7 @@ async fn issue_native_token(
 				Some(&approved.device_id),
 				(Some(&access_token), Some(expires_in)),
 				Some(&refresh_token),
-				Some("QR login"),
+				Some(initial_device_display_name),
 				None,
 			)
 			.await?;
@@ -363,10 +448,10 @@ mod tests {
 	};
 
 	use super::{
-		ApprovedDeviceGrant, DEVICE_CODE_GRANT_TYPE, DeviceTokenRequest,
-		REFRESH_TOKEN_GRANT_TYPE, RefreshTokenRequest, TokenIssue, approved_grant_for_issuance,
-		oauth_token_error_response, oauth_token_route, refresh_scope_for_device,
-		token_disabled_error, token_success_response,
+		AUTHORIZATION_CODE_GRANT_TYPE, ApprovedDeviceGrant, DEVICE_CODE_GRANT_TYPE,
+		DeviceTokenRequest, REFRESH_TOKEN_GRANT_TYPE, RefreshTokenRequest, TokenIssue,
+		approved_grant_for_issuance, oauth_token_error_response, oauth_token_route,
+		refresh_scope_for_device, token_disabled_error, token_success_response,
 	};
 	use crate::client::oauth::revoke::oauth_revoke_route;
 
@@ -515,6 +600,15 @@ mod tests {
 	struct RefreshGrantForm<'a> {
 		grant_type: &'a str,
 		refresh_token: &'a str,
+	}
+
+	#[derive(Serialize)]
+	struct AuthorizationCodeGrantForm<'a> {
+		grant_type: &'a str,
+		code: &'a str,
+		redirect_uri: &'a str,
+		client_id: &'a str,
+		code_verifier: &'a str,
 	}
 
 	#[derive(Serialize)]
@@ -807,6 +901,194 @@ mod tests {
 				.is_err(),
 			"revoke removes the refreshed access token",
 		);
+
+		drop(guard);
+		drop(services);
+		std::fs::remove_dir_all(database_path).ok();
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn authorization_code_grant_issues_native_token_and_rejects_replay()
+	-> tuwunel_core::Result {
+		let (services, database_path) = test_services("authorization-code-grant").await?;
+		let (state, guard) = crate::router::state::create(services.clone());
+		let user_id = owned_user_id!("@oauth:localhost");
+		services
+			.users
+			.create(&user_id, Some("password"), None)
+			.await?;
+		let registered = services
+			.oauth_provider
+			.clients
+			.register(ClientRegistrationRequest {
+				client_name: Some("OAuth test client".into()),
+				client_uri: Some("https://client.example/".into()),
+				redirect_uris: vec!["http://127.0.0.1/callback".into()],
+				grant_types: vec![
+					AUTHORIZATION_CODE_GRANT_TYPE.into(),
+					REFRESH_TOKEN_GRANT_TYPE.into(),
+				],
+				response_types: vec!["code".into()],
+				..Default::default()
+			})
+			.await?;
+		let code = services
+			.oauth_provider
+			.authorize
+			.codes
+			.create(
+				registered.client_id.clone(),
+				"http://127.0.0.1:1234/callback",
+				parse_scope("urn:matrix:client:api:* urn:matrix:client:device:DEVICEOAUTH")?,
+				user_id.clone(),
+				"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+			)
+			.await?;
+
+		let token = post_token(state, &AuthorizationCodeGrantForm {
+			grant_type: AUTHORIZATION_CODE_GRANT_TYPE,
+			code: &code.code,
+			redirect_uri: "http://127.0.0.1:5678/callback",
+			client_id: &registered.client_id,
+			code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+		})
+		.await;
+
+		assert_eq!(token["token_type"], "Bearer");
+		assert!(token.get("id_token").is_none());
+		assert_eq!(
+			token["scope"],
+			"urn:matrix:client:device:DEVICEOAUTH urn:matrix:client:api:*",
+		);
+		let access_token = token["access_token"]
+			.as_str()
+			.expect("access token returned");
+		let (found_user, found_device, _) = services
+			.users
+			.find_from_token(access_token)
+			.await?;
+		assert_eq!(found_user, user_id);
+		assert_eq!(found_device.as_str(), "DEVICEOAUTH");
+
+		let replay = post_token(state, &AuthorizationCodeGrantForm {
+			grant_type: AUTHORIZATION_CODE_GRANT_TYPE,
+			code: &code.code,
+			redirect_uri: "http://127.0.0.1:5678/callback",
+			client_id: &registered.client_id,
+			code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+		})
+		.await;
+		assert_eq!(replay["error"], "invalid_grant");
+
+		drop(guard);
+		drop(services);
+		std::fs::remove_dir_all(database_path).ok();
+
+		Ok(())
+	}
+
+	#[tokio::test]
+	async fn authorization_code_grant_rejects_bad_verifier_bindings_and_unknown_client()
+	-> tuwunel_core::Result {
+		let (services, database_path) = test_services("authorization-code-grant-errors").await?;
+		let (state, guard) = crate::router::state::create(services.clone());
+		let user_id = owned_user_id!("@oauth-errors:localhost");
+		services
+			.users
+			.create(&user_id, Some("password"), None)
+			.await?;
+		let registered = services
+			.oauth_provider
+			.clients
+			.register(ClientRegistrationRequest {
+				client_name: Some("OAuth test client".into()),
+				client_uri: Some("https://client.example/".into()),
+				redirect_uris: vec!["https://client.example/callback".into()],
+				grant_types: vec![AUTHORIZATION_CODE_GRANT_TYPE.into()],
+				response_types: vec!["code".into()],
+				..Default::default()
+			})
+			.await?;
+		let other_registered = services
+			.oauth_provider
+			.clients
+			.register(ClientRegistrationRequest {
+				client_name: Some("Other OAuth test client".into()),
+				client_uri: Some("https://other-client.example/".into()),
+				redirect_uris: vec!["https://client.example/callback".into()],
+				grant_types: vec![AUTHORIZATION_CODE_GRANT_TYPE.into()],
+				response_types: vec!["code".into()],
+				..Default::default()
+			})
+			.await?;
+
+		let make_code = |device: &'static str| {
+			let services = services.clone();
+			let client_id = registered.client_id.clone();
+			let user_id = user_id.clone();
+			async move {
+				services
+					.oauth_provider
+					.authorize
+					.codes
+					.create(
+						client_id,
+						"https://client.example/callback",
+						parse_scope(&format!(
+							"urn:matrix:client:api:* urn:matrix:client:device:{device}"
+						))?,
+						user_id,
+						"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+					)
+					.await
+			}
+		};
+
+		let bad_verifier = make_code("BADVERIFIER").await?;
+		let response = post_token(state, &AuthorizationCodeGrantForm {
+			grant_type: AUTHORIZATION_CODE_GRANT_TYPE,
+			code: &bad_verifier.code,
+			redirect_uri: "https://client.example/callback",
+			client_id: &registered.client_id,
+			code_verifier: "wrong",
+		})
+		.await;
+		assert_eq!(response["error"], "invalid_grant");
+
+		let bad_redirect = make_code("BADREDIRECT").await?;
+		let response = post_token(state, &AuthorizationCodeGrantForm {
+			grant_type: AUTHORIZATION_CODE_GRANT_TYPE,
+			code: &bad_redirect.code,
+			redirect_uri: "https://client.example/other",
+			client_id: &registered.client_id,
+			code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+		})
+		.await;
+		assert_eq!(response["error"], "invalid_grant");
+
+		let wrong_client = make_code("WRONGCLIENT").await?;
+		let response = post_token(state, &AuthorizationCodeGrantForm {
+			grant_type: AUTHORIZATION_CODE_GRANT_TYPE,
+			code: &wrong_client.code,
+			redirect_uri: "https://client.example/callback",
+			client_id: &other_registered.client_id,
+			code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+		})
+		.await;
+		assert_eq!(response["error"], "invalid_grant");
+
+		let unknown_client = make_code("UNKNOWNCLIENT").await?;
+		let response = post_token(state, &AuthorizationCodeGrantForm {
+			grant_type: AUTHORIZATION_CODE_GRANT_TYPE,
+			code: &unknown_client.code,
+			redirect_uri: "https://client.example/callback",
+			client_id: "unknown-client",
+			code_verifier: "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk",
+		})
+		.await;
+		assert_eq!(response["error"], "invalid_client");
 
 		drop(guard);
 		drop(services);

@@ -1073,6 +1073,12 @@ pub struct Config {
 	#[serde(default = "default_consent_session_ttl_secs")]
 	pub consent_session_ttl_secs: u64,
 
+	/// OAuth authorization code lifetime in seconds.
+	///
+	/// default: 60
+	#[serde(default = "default_auth_code_ttl_secs")]
+	pub auth_code_ttl_secs: u64,
+
 	/// Static TURN username to provide the client if not using a shared secret
 	/// ("turn_secret"), It is recommended to use a shared secret over static
 	/// credentials.
@@ -3377,6 +3383,8 @@ fn default_device_grant_expires_secs() -> u64 { 600 }
 fn default_device_grant_interval_secs() -> u64 { 5 }
 
 fn default_consent_session_ttl_secs() -> u64 { 600 }
+
+fn default_auth_code_ttl_secs() -> u64 { 60 }
 
 fn default_presence_idle_timeout_s() -> u64 { 5 * 60 }
 

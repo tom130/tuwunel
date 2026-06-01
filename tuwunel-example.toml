@@ -877,6 +877,10 @@
 #
 #consent_session_ttl_secs = 600
 
+# OAuth authorization code lifetime in seconds.
+#
+#auth_code_ttl_secs = 60
+
 # Static TURN username to provide the client if not using a shared secret
 # ("turn_secret"), It is recommended to use a shared secret over static
 # credentials.

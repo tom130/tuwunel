@@ -194,6 +194,10 @@ pub fn build(router: Router<State>, server: &Server) -> Router<State> {
 			"/_tuwunel/oauth/link",
 			get(client::get_oauth_link_route).post(client::post_oauth_link_route),
 		)
+		.route(
+			"/_tuwunel/oauth/authorize",
+			get(client::get_oauth_authorize_route).post(client::post_oauth_authorize_route),
+		)
 		.route("/_tuwunel/oauth/token", post(client::oauth_token_route))
 		.route("/_tuwunel/oauth/revoke", post(client::oauth_revoke_route))
 		.ruma_route(&client::send_event_to_device_route)
