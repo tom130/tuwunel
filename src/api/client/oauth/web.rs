@@ -2,7 +2,7 @@ use axum::response::{Html, IntoResponse, Response};
 use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
 use http::{
 	HeaderValue, StatusCode,
-	header::{CACHE_CONTROL, SET_COOKIE},
+	header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, SET_COOKIE},
 };
 use tuwunel_core::Result;
 use tuwunel_service::oauth_provider::consent::{BrowserSession, CreatedSession};
@@ -10,6 +10,8 @@ use url::Url;
 
 const CONSENT_COOKIE: &str = "tuwunel_oauth_consent";
 const CONSENT_COOKIE_PATH: &str = "/_tuwunel/oauth";
+const OAUTH_HTML_CSP: &str = "default-src 'none';style-src 'unsafe-inline';form-action \
+                              'self';frame-ancestors 'none';base-uri 'none'";
 const MESSAGE_TEMPLATE: &str = include_str!("templates/consent_message.html");
 
 pub(crate) async fn consent_session_from_cookie(
@@ -95,6 +97,9 @@ pub(crate) fn html_response(status: StatusCode, body: String) -> Response {
 		.headers_mut()
 		.insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
 	response
+		.headers_mut()
+		.insert(CONTENT_SECURITY_POLICY, HeaderValue::from_static(OAUTH_HTML_CSP));
+	response
 }
 
 pub(crate) fn public_base_url(services: crate::State) -> String {
@@ -117,4 +122,26 @@ pub(crate) fn escape_html(value: &str) -> String {
 		.replace('>', "&gt;")
 		.replace('"', "&quot;")
 		.replace('\'', "&#39;")
+}
+
+#[cfg(test)]
+mod tests {
+	use http::{StatusCode, header::CONTENT_SECURITY_POLICY};
+
+	use super::html_response;
+
+	#[test]
+	fn oauth_html_responses_allow_browser_form_flows() {
+		let response = html_response(StatusCode::OK, "<form method=\"post\"></form>".into());
+		let csp = response
+			.headers()
+			.get(CONTENT_SECURITY_POLICY)
+			.and_then(|value| value.to_str().ok())
+			.expect("oauth html response sets a CSP");
+
+		assert!(csp.contains("form-action 'self'"));
+		assert!(csp.contains("style-src 'unsafe-inline'"));
+		assert!(!csp.contains("form-action 'none'"));
+		assert!(!csp.contains("sandbox"));
+	}
 }
