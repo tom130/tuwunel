@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Update Fork from Upstream tuwunel 1.5.0 → 1.8.2+</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #16212e;
+  --muted: #5b6b7d;
+  --line: #dde3ea;
+  --accent: #0e7490;
+  --accent-soft: #e0f2f7;
+  --warn: #b45309;
+  --warn-soft: #fdf1e0;
+  --ok: #15803d;
+  --ok-soft: #e5f4e9;
+  --bad: #b91c1c;
+  --code-bg: #eef1f5;
+  --mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10161d;
+    --surface: #18212b;
+    --ink: #e4eaf1;
+    --muted: #93a3b5;
+    --line: #2a3644;
+    --accent: #38bdd8;
+    --accent-soft: #12303a;
+    --warn: #e0a04a;
+    --warn-soft: #33270f;
+    --ok: #4ade80;
+    --ok-soft: #10291a;
+    --bad: #f87171;
+    --code-bg: #202b37;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.6;
+  font-size: 16px;
+}
+main { max-width: 980px; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+h1 { font-size: 1.9rem; line-height: 1.25; letter-spacing: -0.02em; margin: 0 0 0.75rem; }
+h2 {
+  font-size: 1.35rem; letter-spacing: -0.01em; margin: 3rem 0 1rem;
+  padding-bottom: 0.4rem; border-bottom: 2px solid var(--accent);
+}
+h3 { font-size: 1.1rem; margin: 1.8rem 0 0.6rem; }
+h4 { font-size: 0.98rem; margin: 1.5rem 0 0.5rem; color: var(--accent); }
+p { margin: 0.6rem 0; }
+a { color: var(--accent); }
+code {
+  font-family: var(--mono); font-size: 0.85em;
+  background: var(--code-bg); padding: 0.12em 0.35em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.9rem 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.55;
+}
+pre code { background: none; padding: 0; }
+figure { margin: 2rem 0; text-align: center; }
+figure img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+figure svg {
+  max-width: 100%; height: auto; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.dlabel { font-family: var(--mono); font-size: 13px; fill: var(--muted); }
+.dlabel-strong { font-family: var(--mono); font-size: 14px; font-weight: 700; fill: var(--ink); }
+figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.6rem; }
+details.meta {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; margin: 1rem 0 2rem; font-size: 0.88rem;
+}
+details.meta summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+details.meta dl { display: grid; grid-template-columns: 9rem 1fr; gap: 0.25rem 1rem; margin: 0.8rem 0 0.3rem; }
+details.meta dt { font-weight: 600; color: var(--muted); }
+details.meta dd { margin: 0; font-family: var(--mono); font-size: 0.82rem; overflow-wrap: anywhere; }
+section { margin-bottom: 1rem; }
+.tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 0.1em 0.55em; border-radius: 999px; margin-right: 0.4em;
+}
+.tag.existing { background: var(--accent-soft); color: var(--accent); }
+.tag.new { background: var(--ok-soft); color: var(--ok); }
+.files ul { list-style: none; padding-left: 0; }
+.files li { padding: 0.3rem 0; border-bottom: 1px dashed var(--line); font-size: 0.92rem; }
+.phase {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 1.2rem 1.6rem 1.6rem; margin: 1.6rem 0;
+}
+.phase h3 { margin-top: 0.2rem; }
+code.status { color: var(--warn); font-weight: 700; background: var(--warn-soft); }
+ul.checklist { list-style: none; padding-left: 0.2rem; }
+ul.checklist li { padding: 0.28rem 0; font-size: 0.94rem; }
+.loop {
+  background: var(--warn-soft); border-left: 4px solid var(--warn);
+  padding: 0.7rem 1rem; border-radius: 6px; margin-top: 1.2rem; font-size: 0.92rem;
+}
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.88rem; }
+th, td { border: 1px solid var(--line); padding: 0.45rem 0.7rem; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+.evidence {
+  background: var(--accent-soft); border-left: 4px solid var(--accent);
+  padding: 0.7rem 1rem; border-radius: 6px; margin: 1rem 0; font-size: 0.92rem;
+}
+.rejected {
+  background: var(--surface); border: 1px dashed var(--line); border-radius: 8px;
+  padding: 0.8rem 1.1rem; margin: 0.8rem 0; font-size: 0.92rem;
+}
+.kpi { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+.table-scroll { overflow-x: auto; }
+#questionables details, #amendments details {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; margin: 0.8rem 0; font-size: 0.92rem;
+}
+#questionables summary, #amendments summary { cursor: pointer; font-weight: 600; }
+.qa-answer { margin: 0.5rem 0 0.2rem; }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- ===== HEADER + UPDATABLE METADATA ===== -->
+  <header>
+    <h1>Plan: Update Fork from Upstream tuwunel 1.5.0 → 1.8.2+</h1>
+    <details class="meta">
+      <summary>Metadata</summary>
+      <dl>
+        <dt>created</dt>      <dd>2026-08-04T15:03:30Z</dd>
+        <dt>modified</dt>     <dd>2026-08-04T15:03:30Z</dd>
+        <dt>commits</dt>      <dd>73a8e175 (fork HEAD at planning), b66e1915 (fork main), adf1c0bd (upstream main), b20ad8a6 (merge-base)</dd>
+        <dt>agent name</dt>   <dd>claude-fable-5 (planf3)</dd>
+        <dt>session id</dt>   <dd>4d13eed3-bd9e-4b25-ae09-428f50918a3e</dd>
+        <dt>back refs</dt>    <dd>msc4108-qr-login-PLAN.md, oauth-authorization-code-PLAN.md</dd>
+        <dt>forward refs</dt> <dd>—</dd>
+      </dl>
+    </details>
+  </header>
+
+  <figure>
+    <img src="update-from-upstream-1.8.2/hero.png" alt="Pipeline diagram: fork main 1.5.0 contributes fork CI only, upstream main 1.8.2 is the base; both converge into update-1.8.2, then verify, main force-push, deploy">
+    <figcaption>The update at a glance: rebuild the fork on top of upstream <code>main</code> (v1.8.2+), carrying forward only what upstream does not already provide.</figcaption>
+  </figure>
+
+  <!-- ===== PURPOSE / PROBLEM / SOLUTION ===== -->
+  <section id="purpose">
+    <h2>Purpose</h2>
+    <p>Bring the fork (<code>tom130/tuwunel</code>) up to date with upstream <code>matrix-construct/tuwunel</code> — <span class="kpi">1141</span> commits, v1.5.0 → v1.8.2+ — while preserving every piece of functionality the fork was created for. Acceptance bar: after the update the fork carries <span class="kpi">≤ 2</span> commits on top of upstream <code>main</code> (fork CI, plus a tini build fix only if still required); all fork features verified working on the new base — appservice E2EE/MSC4190, MSC4326, MSC4108 QR login, MSC4143 RTC transports, OAuth/OIDC-native login for Element X, plaintext-room device-list sync; <span class="kpi">0</span> test failures; a working GHCR image from fork CI; and a documented, reversible deployment path for <code>matrix.datadialect.cz</code>. Out of scope: the other historical branches on origin (<code>dashadev</code>, <code>key_revoke</code>, <code>msc4361</code>, <code>mediafix</code>, <code>spaces-cache</code>, …) — they are separate lines of work, not part of <code>main</code>; and any new feature development.</p>
+  </section>
+
+  <section id="problem">
+    <h2>Problem</h2>
+    <p>The fork diverged from upstream at <code>b20ad8a6</code> (2026-03-04, v1.5.0 era) and has not been updated since. Upstream has moved 1141 commits ahead. A naive merge would be painful and wrong: research shows nearly every fork feature was either <em>absorbed verbatim</em> upstream (the appservice MSC4190/MSC4326 patches, the plaintext device-list sync fix) or <em>re-implemented more completely</em> (MSC4108 rendezvous, MSC4143, and the entire OAuth stack). Keeping the fork's implementations would not just duplicate code — the fork's and upstream's OAuth both register <code>GET /_matrix/client/v1/auth_metadata</code>, and axum <strong>panics at startup</strong> on duplicate route registration. The fork's remaining unique value is exactly two things: the fork CI pipeline (ARM64 nix → GHCR image) and its deployment configuration.</p>
+    <div class="evidence">
+      <strong>Codebase verification (research 2026-08-04):</strong> Disposition of all 24 fork-only commits established via <code>git cherry</code>, patch-id and upstream tree inspection at <code>adf1c0bd</code>: MSC4326 <code>82e674cc</code> ≡ upstream <code>7b60e906c</code> and device-id params <code>375069a7</code> ≡ <code>e60c176b1</code> (patch-identical); MSC4190 fixes <code>d9bf8b73</code>/<code>e38e4e50</code> ≡ upstream <code>1810279ce</code>/<code>58564f40c</code> (same author, restructured tree); plaintext device-list sync <code>73a8e175</code> ≡ upstream <code>0adec1e3a</code> (config key <code>device_key_update_encrypted_rooms_only</code> present at upstream <code>src/core/config/mod.rs:3396</code>); MSC4108 superseded by upstream <code>7f3802706</code>+<code>adfd3ee22</code> (per-IP token-bucket rate limiting, MSC4388, <code>rendezvous_enabled</code> gate); MSC4143 superseded by <code>bbad352dc</code> (typed <code>ruma_route</code>, same <code>well_known.rtc_transports</code> config, advertised unconditionally at <code>versions.rs:113</code>); fork OAuth provider superseded by upstream's native OIDC server (<code>src/service/oauth/server/*</code>, <code>src/api/oidc/*</code> — auth-code+PKCE, device grant with consent UI, dynamic registration, JWKS, userinfo, account-management UI, DB-persisted signing keys, gated by <code>oidc_native_auth</code> at <code>config/mod.rs:1624</code> + required <code>well_known.client</code> per <code>server.rs:81-102</code>). Upstream additionally fixed three gaps the fork still has: 201 on MSC4190 device create + login rejection (<code>acbfb9d18</code>) and UIAA skip on cross-signing replacement (<code>740f8ef95</code>).
+    </div>
+    <figure>
+      <img src="update-from-upstream-1.8.2/problem.png" alt="Divergence diagram: merge-base splits into 24 fork commits and 1141 upstream commits, both landing in a superseded-features zone where /auth_metadata leads to startup panic">
+      <figcaption>Two diverged histories re-implement the same features; both sides claim <code>/auth_metadata</code>, so they cannot textually merge — the fork's implementations must yield.</figcaption>
+    </figure>
+  </section>
+
+  <section id="solution">
+    <h2>Solution</h2>
+    <p>Do not merge — <strong>rebuild</strong>. Create integration branch <code>update-1.8.2</code> directly from upstream <code>main</code> (<code>adf1c0bd</code>), then re-apply only the surviving fork delta: the fork CI workflow (one commit) and, if the nix build proves it still necessary, the 4-line tini CMake-4 fix. Every superseded fork implementation is deliberately <em>not</em> ported — its functionality is preserved by upstream's equivalent, which is verified feature-by-feature in a dedicated phase. The deployment configuration is migrated by key rename (<code>next_gen_auth</code> → <code>oidc_native_auth</code>, renamed <code>rendezvous_*</code> keys, removed fork-only TTL knobs). Finally, fork <code>main</code> is reset to the integration branch and force-pushed with a backup branch left behind, and the production upgrade follows a runbook whose first step is a database backup — upstream drops four RocksDB column families irreversibly on first start.</p>
+    <figure>
+      <img src="update-from-upstream-1.8.2/solution.png" alt="Triage pipeline: 24 fork commits triaged into already upstream, superseded, and keep: fork CI; the keep bin is squashed onto upstream main forming update-1.8.2">
+      <figcaption>Commit triage: 22 of 24 fork commits are already upstream or superseded; only the fork CI (and possibly the tini fix) ride forward.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== RELEVANT FILES ===== -->
+  <section id="files" class="files">
+    <h2>Relevant Files</h2>
+
+    <h3>Existing Files</h3>
+    <ul>
+      <li><span class="tag existing">existing</span> <code>.github/workflows/fork-ci.yml</code> — the fork's only must-keep artifact: 46-line workflow, ARM64 runner, <code>nix build .#oci-image</code>, GHCR push. Output name survives upstream at <code>flake.nix:293</code>.</li>
+      <li><span class="tag existing">existing</span> <code>flake.nix</code> — fork added <code>cmakeFlags = [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ]</code> to the tini override (fork <code>flake.nix:69-72</code>); upstream's override (<code>flake.nix:61-69</code> at <code>adf1c0bd</code>) still lacks it — re-apply only if the nix build fails on tini.</li>
+      <li><span class="tag existing">existing</span> <code>src/service/oauth_provider/</code>, <code>src/api/client/oauth/</code>, <code>src/admin/query/oauth.rs</code> — fork's OAuth server; <strong>dropped</strong>, superseded by upstream <code>src/service/oauth/server/</code> + <code>src/api/oidc/</code>.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/client/rendezvous.rs</code>, <code>src/service/rendezvous/mod.rs</code> — fork MSC4108; <strong>dropped</strong>, superseded by upstream's rendezvous (API dir + service, incl. MSC4388).</li>
+      <li><span class="tag existing">existing</span> <code>src/api/client/rtc.rs</code> — fork MSC4143; <strong>dropped</strong>, upstream's typed handler reads the same <code>well_known.rtc_transports</code> config via <code>get_transports()</code>.</li>
+      <li><span class="tag existing">existing</span> <code>src/core/config/mod.rs</code> (upstream) — target config surface: <code>oidc_native_auth:1624</code>, <code>oidc_registration_*:1677-1704</code>, <code>rendezvous_enabled:1743</code>, <code>rendezvous_session_max_bytes:1753</code>, <code>rendezvous_session_ttl:1765</code>, <code>rendezvous_max_sessions:1776</code>, <code>mas_secret:883</code>.</li>
+      <li><span class="tag existing">existing</span> <code>src/service/migrations/mod.rs</code> (upstream) — <code>DATABASE_VERSION = 17</code> unchanged at <code>:34</code>; no version-gate on rollback, but see dropped CFs.</li>
+      <li><span class="tag existing">existing</span> <code>src/database/maps.rs</code> (upstream) — four <code>descriptor::DROPPED</code> entries: <code>onetimekeyid_onetimekeys</code>, <code>roomid_ts_pducount</code>, <code>roomsynctoken_shortstatehash</code>, <code>url_previews</code> — deleted on first start unless <code>rocksdb_never_drop_columns</code>.</li>
+      <li><span class="tag existing">existing</span> <code>src/database/engine/open.rs</code> (upstream) — <code>:97-187</code>: undescribed on-disk CFs (the fork's <code>oauthclient_metadata</code>) are opened as <code>IGNORED</code>, not fatal.</li>
+      <li><span class="tag existing">existing</span> <code>rust-toolchain.toml</code> — channel 1.91.1 → <span class="kpi">1.95.0</span>; rustup picks it up automatically, fenix hash comes with upstream's flake.</li>
+      <li><span class="tag existing">existing</span> <code>msc4108-qr-login-PLAN.md</code>, <code>oauth-authorization-code-PLAN.md</code> — fork's historical plan docs at repo root; moved under <code>plans/archive/</code> (they describe dropped code; lychee lint scans root <code>*.md</code>).</li>
+      <li><span class="tag existing">existing</span> <code>docs/qr_login.md</code>, <code>docs/SUMMARY.md:20</code> — fork QR-login doc; dropped with the fork implementation (upstream documents its own auth stack, incl. a MAS provider guide).</li>
+      <li><span class="tag existing">existing</span> <code>tuwunel-example.toml</code> — regenerated with upstream; never hand-merged.</li>
+    </ul>
+
+    <h3>New Files</h3>
+    <ul>
+      <li><span class="tag new">new</span> <code>plans/update-from-upstream-1.8.2.html</code> — this plan.</li>
+      <li><span class="tag new">new</span> <code>plans/update-from-upstream-1.8.2/*.png</code> — plan diagrams.</li>
+      <li><span class="tag new">new</span> <code>plans/archive/</code> — destination for the two legacy root-level plan markdown files.</li>
+      <li><span class="tag new">new</span> <code>plans/deploy-config-1.8.2.md</code> — the migrated deployment config diff for <code>matrix.datadialect.cz</code>, produced in Phase 4 (secrets excluded; a rename map + runbook, committed for reference).</li>
+    </ul>
+  </section>
+
+  <!-- ===== IMPLEMENTATION PHASES ===== -->
+  <section id="phases">
+    <h2>Implementation Phases</h2>
+    <p><strong>IMPORTANT:</strong> Execute every phase and task step by step, in order, top to bottom.</p>
+    <p>Status markers: <code>[]</code> idle · <code>[wip]</code> in progress · <code>[x]</code> complete · <code>[f]</code> failed. All start as <code>[]</code>; the executing workflow updates them as it works.</p>
+
+    <div class="phase">
+      <h3><code class="status">[x]</code> Phase 1: Prepare &amp; Safety Nets</h3>
+      <p>Anchor the update on stable refs and make every prior state recoverable before rewriting anything. The fork's history stays reachable through backup branches even after <code>main</code> is force-pushed in Phase 6.</p>
+
+      <h4>1. Set up remotes and backups</h4>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> <code>git remote add upstream https://github.com/matrix-construct/tuwunel.git && git fetch upstream main --tags</code></li>
+        <li><code class="status">[x]</code> <code>git branch backup/main-pre-1.8.2 b66e1915</code> — snapshot of fork <code>main</code></li>
+        <li><code class="status">[x]</code> <code>git branch backup/fix-appservice-e2ee-msc4190 73a8e175</code> — snapshot of the work branch</li>
+        <li><code class="status">[x]</code> <code>git push origin backup/main-pre-1.8.2 backup/fix-appservice-e2ee-msc4190</code> — backups live on origin before any rewrite</li>
+        <li><code class="status">[x]</code> <code>git switch -c update-1.8.2 upstream/main</code> — integration branch at <code>adf1c0bd</code> or newer</li>
+      </ul>
+
+      <h4>2. Testing Strategy</h4>
+      <p>Pure git-state verification; nothing is built yet. Confirms the safety nets exist on the remote and the integration branch sits on upstream.</p>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> <code>git ls-remote origin | grep backup/</code> — both backup branches are on origin</li>
+        <li><code class="status">[x]</code> <code>git merge-base --is-ancestor v1.8.2 update-1.8.2 && echo ok</code> — integration branch contains the v1.8.2 release</li>
+        <li><code class="status">[x]</code> <code>grep -m1 channel rust-toolchain.toml</code> — shows 1.95.0; rustup will fetch it on first cargo call</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[wip]</code> Phase 2: Re-apply the Fork CI</h3>
+      <p>The only fork code that must ride forward. Restore the workflow file from the backup branch as a single clean commit; touch <code>flake.nix</code> only if the build proves the tini CMake-4 problem still exists on upstream's newer nixpkgs pin (upstream never builds <code>.#oci-image</code> in its own CI, so it would not have noticed).</p>
+
+      <h4>1. Restore workflow and housekeeping</h4>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> <code>git checkout backup/main-pre-1.8.2 -- .github/workflows/fork-ci.yml</code></li>
+        <li><code class="status">[x]</code> <code>mkdir -p plans/archive && git mv msc4108-qr-login-PLAN.md oauth-authorization-code-PLAN.md plans/archive/</code> — the docs describe dropped code; keep them out of upstream's root-level lychee scan</li>
+        <li><code class="status">[x]</code> Add <code>plans/update-from-upstream-1.8.2.html</code> + images to the repo</li>
+        <li><code class="status">[wip]</code> Commit: <code>Fork CI: restore fork-ci workflow on 1.8.2 base.</code></li>
+      </ul>
+
+      <h4>2. Probe the tini build</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>nix build .#oci-image --print-build-logs</code> — watch the tini derivation</li>
+        <li><code class="status">[]</code> If tini fails with a CMake ≥ 4 policy error: add <code>cmakeFlags = (old.cmakeFlags or []) ++ [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];</code> inside upstream's tini override (converting it to the <code>overrideAttrs (old: …)</code> lambda form), commit as <code>nix: Fix tini build under CMake >= 4.</code> — otherwise skip and record that the fix is obsolete</li>
+      </ul>
+
+      <h4>3. Testing Strategy</h4>
+      <p>The nix build is the test — it compiles the workspace with <code>doCheck = true</code> (unit tests run inside the derivation) and assembles the OCI tarball exactly as CI will.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>nix build .#oci-image --print-build-logs</code> — completes; <code>result</code> is a loadable docker tarball</li>
+        <li><code class="status">[]</code> <code>docker load &lt; result && docker images | head -3</code> — image loads and reports version 1.8.x</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 3: Feature-Parity Verification (code level)</h3>
+      <p>Prove "do not break our additional functionality" against the evidence table, feature by feature, on the integration branch. Each check pins the upstream mechanism that replaces the fork's. Any genuine gap found here becomes a minimal port commit — research predicts <span class="kpi">zero</span>.</p>
+
+      <figure>
+        <img src="update-from-upstream-1.8.2/phase3-parity.png" alt="Mapping diagram: fork features MSC4190, MSC4108, MSC4143, OAuth each map to upstream replacements device API, rendezvous, ruma route, OIDC server">
+        <figcaption>Every fork feature and the upstream mechanism that now provides it.</figcaption>
+      </figure>
+
+      <h4>1. Appservice E2EE / MSC4190 / MSC4326</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>git log --oneline --grep=4190 --grep=4326 v1.5.0..HEAD</code> — upstream carries <code>1810279ce</code>, <code>58564f40c</code>, <code>e60c176b1</code>, <code>7b60e906c</code>, <code>acbfb9d18</code>, <code>740f8ef95</code></li>
+        <li><code class="status">[]</code> Read <code>src/api/client/device/devices_device.rs</code> — appservice create honors requested device id, passes no access token, returns 201</li>
+        <li><code class="status">[]</code> Read <code>src/api/router/auth/appservice.rs</code> — asserted <code>device_id</code> accepted (stable + <code>org.matrix.msc3202.device_id</code>), unknown device rejected</li>
+        <li><code class="status">[]</code> <code>grep -rn device_key_update_encrypted_rooms_only src/core/config/</code> — plaintext device-list sync knob present</li>
+      </ul>
+
+      <h4>2. MSC4108 + MSC4143</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>grep -n rendezvous src/api/router.rs</code> — POST/GET/PUT/DELETE on <code>/_matrix/client/unstable/org.matrix.msc4108/rendezvous</code> registered (plus MSC4388 routes)</li>
+        <li><code class="status">[]</code> Confirm <code>versions.rs</code> advertises <code>org.matrix.msc4108</code> when <code>rendezvous_enabled</code> and <code>org.matrix.msc4143</code> unconditionally</li>
+        <li><code class="status">[]</code> Check the ruma path metadata for <code>rtc::transports</code> (matrix-construct/ruma rev in <code>Cargo.toml</code>) — note whether the stable <code>/v1/rtc/transports</code> alias the fork registered exists; if clients in use depend on it and it is absent, add a one-line unstable→stable route alias as a port commit, else record as accepted difference</li>
+      </ul>
+
+      <h4>3. OAuth / OIDC-native login (replaces fork OAuth provider)</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Read <code>src/service/oauth/server.rs:81-102</code> — server builds when <code>oidc_native_auth</code> + <code>well_known.client</code> set</li>
+        <li><code class="status">[]</code> Enumerate <code>src/api/oidc/</code> — authorize + complete (auth-code+PKCE), device/* (device grant + consent UI), registration, token, revoke, jwks, userinfo, auth_issuer, auth_metadata, account/* — every fork OAuth capability has an upstream counterpart</li>
+        <li><code class="status">[]</code> <code>grep -n 'auth_metadata\|openid-configuration' src/api/router.rs</code> — MSC2965 discovery served from exactly one implementation (no duplicate-route panic possible: fork routes are gone)</li>
+        <li><code class="status">[]</code> Check the default of <code>oidc_registration_access_token</code> (<code>config/mod.rs:1677</code>) — confirm dynamic client registration works for Element X without a pre-shared token, or note the required config</li>
+      </ul>
+
+      <h4>4. Testing Strategy</h4>
+      <p>Compile-and-test the full workspace on the new toolchain; upstream's own unit tests (including its oidc and rendezvous tests) are the regression net for the replaced features.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo build --workspace</code> — clean build on Rust 1.95.0</li>
+        <li><code class="status">[]</code> <code>cargo test --workspace</code> — all tests pass</li>
+        <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets</code> — no new warnings introduced by the two fork commits</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 4: Deployment Config Migration</h3>
+      <p>The fork's config keys largely ceased to exist. Produce <code>plans/deploy-config-1.8.2.md</code> holding the exact rename map and the migrated (secret-free) config fragment for <code>matrix.datadialect.cz</code>, then prove it boots cleanly. Stale keys only warn by default (<code>check.rs: warn_unknown_key</code>) — clean them anyway.</p>
+
+      <figure>
+        <img src="update-from-upstream-1.8.2/phase4-config.png" alt="Config migration: next_gen_auth becomes oidc_native_auth, rendezvous_ttl_secs becomes rendezvous_session_ttl, oauth TTL knobs become built-in constants">
+        <figcaption>Config key migration: one gate renamed, rendezvous keys renamed, fork tunables absorbed into upstream constants.</figcaption>
+      </figure>
+
+      <h4>1. Build the rename map</h4>
+      <div class="table-scroll">
+        <table>
+          <tr><th>Fork key (1.5.0)</th><th>Upstream key (1.8.2+)</th><th>Note</th></tr>
+          <tr><td><code>next_gen_auth</code></td><td><code>oidc_native_auth</code></td><td>Also gates rendezvous no longer — enable <code>rendezvous_enabled</code> separately. Requires <code>well_known.client</code> to be set or the OIDC server silently stays off (<code>server.rs:86-90</code> warns).</td></tr>
+          <tr><td><code>rendezvous_ttl_secs</code></td><td><code>rendezvous_session_ttl</code></td><td>Renamed.</td></tr>
+          <tr><td><code>rendezvous_max_bytes</code></td><td><code>rendezvous_session_max_bytes</code></td><td>Renamed.</td></tr>
+          <tr><td><code>rendezvous_max_sessions</code></td><td><code>rendezvous_max_sessions</code></td><td>Unchanged.</td></tr>
+          <tr><td><code>rendezvous_rate_limit_per_minute</code></td><td><code>rendezvous_rc_per_second</code> + <code>rendezvous_rc_burst_count</code></td><td>Global window → per-IP token bucket.</td></tr>
+          <tr><td><code>device_grant_expires_secs</code>, <code>device_grant_interval_secs</code>, <code>consent_session_ttl_secs</code>, <code>auth_code_ttl_secs</code></td><td>— (remove)</td><td>Upstream constants: <code>DEVICE_GRANT_LIFETIME</code>, <code>DEVICE_GRANT_INTERVAL_SECS</code>, <code>AUTH_REQUEST_LIFETIME</code>.</td></tr>
+          <tr><td><code>well_known.rtc_transports</code></td><td><code>well_known.rtc_transports</code></td><td>Unchanged — MSC4143 config survives as-is.</td></tr>
+          <tr><td><code>device_key_update_encrypted_rooms_only</code></td><td>same</td><td>Present upstream; default matches fork behavior.</td></tr>
+          <tr><td>—</td><td><code>oidc_registration_allowed_redirect_hosts</code>, <code>oidc_require_pkce</code>, <code>oidc_rc_*</code></td><td>New knobs — review defaults, set redirect-host allowlist for Element X if needed.</td></tr>
+        </table>
+      </div>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Write <code>plans/deploy-config-1.8.2.md</code> with the table above plus the migrated config fragment (no secrets) and the Phase 6 runbook</li>
+        <li><code class="status">[]</code> Diff the deployed server's live config against the map; every fork-only key renamed or removed</li>
+      </ul>
+
+      <h4>2. Testing Strategy</h4>
+      <p>Boot the new binary against the migrated config with a scratch database; the config checker is the test harness — it must produce no unknown-key warnings and the OIDC server must actually initialize.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>TUWUNEL_DATABASE_PATH=$(mktemp -d) target/debug/tuwunel -c migrated.toml</code> — starts; log shows <code>Initializing OIDC server for next-gen auth (MSC2965)</code>; no <code>unknown to tuwunel</code> warnings</li>
+        <li><code class="status">[]</code> <code>curl -s localhost:8008/_matrix/client/v1/auth_metadata | jq .issuer</code> — 200 with the server's issuer</li>
+        <li><code class="status">[]</code> <code>curl -s localhost:8008/_matrix/client/versions | jq '.unstable_features'</code> — <code>org.matrix.msc4108</code> (with rendezvous on), <code>org.matrix.msc4143</code>, <code>org.matrix.msc3861</code> present</li>
+        <li><code class="status">[]</code> <code>curl -s localhost:8008/.well-known/matrix/client | jq</code> — <code>m.authentication</code> and (if configured) <code>org.matrix.msc4143.rtc_foci</code> present</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 5: Runtime Validation of Fork-Critical Flows</h3>
+      <p>Code parity is not user parity. Exercise the flows the fork existed for, against the locally running 1.8.2+ build from Phase 4 (and, where a real client is needed, against a staging deployment of the Phase 2 image).</p>
+
+      <h4>1. Appservice / bridge flow (MSC4190 + MSC4326)</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Register a test appservice with <code>device_management: true</code>; <code>PUT /_matrix/client/v3/devices/TESTDEV</code> with the <code>as_token</code> — expect <span class="kpi">201</span>, device exists, no access token stored for it</li>
+        <li><code class="status">[]</code> Request with <code>?device_id=TESTDEV</code> asserted — accepted; unknown device — <code>M_INVALID_PARAM</code></li>
+        <li><code class="status">[]</code> <code>POST /keys/device_signing/upload</code> as the appservice user replacing existing cross-signing keys — no UIAA challenge</li>
+      </ul>
+      <h4>2. OAuth login flow (Element X)</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> From Element X (or <code>matrix-rust-sdk</code> example client): discover via well-known → <code>auth_metadata</code> → dynamic registration → authorization-code+PKCE browser login → token — session established</li>
+        <li><code class="status">[]</code> QR login: pair a second device via MSC4108 rendezvous + device grant consent page — completes end-to-end</li>
+        <li><code class="status">[]</code> Password login via <code>POST /_matrix/client/v3/login</code> still works for existing users (coexistence of classic + OIDC auth)</li>
+      </ul>
+      <h4>3. Sync regression</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Two users in an unencrypted room: rotate user B's devices; user A's sliding-sync e2ee extension reports the device-list change (the <code>73a8e175</code> behavior)</li>
+      </ul>
+
+      <h4>4. Testing Strategy</h4>
+      <p>Manual/scripted API-level tests above are primary. Optionally run upstream's Complement suite via docker for broad regression coverage.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> All curl/client checks in tasks 1–3 pass and are recorded in the plan's Amendments on execution</li>
+        <li><code class="status">[]</code> Optional: <code>nix build .#complement</code> / upstream complement harness — no regressions vs upstream baseline</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 6: Land, Publish &amp; Deploy</h3>
+      <p>Rewrite fork <code>main</code> to the verified integration branch, let fork CI publish the image, and upgrade production with an explicit point of no return: upstream deletes four column families on first start, so rollback means restoring the database backup, not just swapping binaries back (<code>DATABASE_VERSION</code> is still 17, so an old binary would silently reopen the mutilated DB).</p>
+
+      <h4>1. Land the branch</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>git switch main && git reset --hard update-1.8.2</code></li>
+        <li><code class="status">[]</code> <code>git push --force-with-lease origin main</code> — backups from Phase 1 keep the old history reachable</li>
+        <li><code class="status">[]</code> <code>git branch -D fix-appservice-e2ee-msc4190</code> — all five commits confirmed upstream; the backup branch preserves it</li>
+        <li><code class="status">[]</code> Watch fork CI: <code>gh run watch</code> — image builds and pushes to GHCR as <code>ghcr.io/tom130/tuwunel:main</code></li>
+      </ul>
+
+      <h4>2. Production upgrade runbook (matrix.datadialect.cz)</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Stop the server; take a full RocksDB backup (copy the database directory or RocksDB checkpoint) — <strong>mandatory</strong>: <code>onetimekeyid_onetimekeys</code>, <code>roomid_ts_pducount</code>, <code>roomsynctoken_shortstatehash</code>, <code>url_previews</code> are dropped on first start</li>
+        <li><code class="status">[]</code> Optional belt-and-braces for the first boot: <code>rocksdb_never_drop_columns = true</code>, remove after a stable week</li>
+        <li><code class="status">[]</code> Deploy the migrated config from Phase 4 + the new image; start; watch logs for migrations, CF drops, and the OIDC-server init line</li>
+        <li><code class="status">[]</code> Post-deploy: re-run the Phase 4 curl checks against the live host; verify bridges reconnect; note that clients logged in via the fork's OAuth endpoints (<code>/_tuwunel/oauth/*</code>) may be prompted to re-login once — their cached token endpoint is gone (tokens themselves are native and stay valid)</li>
+      </ul>
+
+      <h4>3. Testing Strategy</h4>
+      <p>The deployment is validated by the same external checks as staging, plus real-client traffic.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>curl -s https://matrix.datadialect.cz/_matrix/client/v1/auth_metadata | jq .issuer</code> — 200</li>
+        <li><code class="status">[]</code> <code>curl -s https://matrix.datadialect.cz/_matrix/federation/v1/version | jq</code> — reports 1.8.x</li>
+        <li><code class="status">[]</code> Element X login + one bridge round-trip message — both work in production</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GLOBAL VALIDATION ===== -->
+  <section id="validation">
+    <h2>Validation Commands</h2>
+    <p>Execute these commands to validate the entire plan is complete:</p>
+    <ul class="checklist">
+      <li><code class="status">[]</code> <code>git rev-list --count upstream/main..main</code> — ≤ 2 (fork CI + optional tini fix)</li>
+      <li><code class="status">[]</code> <code>cargo build --workspace && cargo test --workspace</code> — clean build, all tests pass on Rust 1.95.0</li>
+      <li><code class="status">[]</code> <code>nix build .#oci-image --print-build-logs</code> — CI's exact build path succeeds locally</li>
+      <li><code class="status">[]</code> <code>gh run list --workflow=fork-ci.yml --limit 1</code> — latest run green, image on GHCR</li>
+      <li><code class="status">[]</code> <code>git ls-remote origin | grep backup/</code> — pre-update history still recoverable</li>
+    </ul>
+    <div class="table-scroll">
+      <table>
+        <tr><th>Check</th><th>Query / method</th><th>Acceptance bar</th></tr>
+        <tr><td>OIDC discovery live</td><td><code>curl https://matrix.datadialect.cz/_matrix/client/v1/auth_metadata</code></td><td>200, issuer = server base URL</td></tr>
+        <tr><td>Element X login</td><td>Manual: fresh login on Element X</td><td>OAuth flow completes; session works</td></tr>
+        <tr><td>QR device pairing</td><td>Manual: MSC4108 pairing from logged-in device</td><td>Second device paired end-to-end</td></tr>
+        <tr><td>Bridge E2EE devices</td><td>Bridge (MSC4190) creates/uses device via as_token</td><td>201 on create; asserted device_id accepted; encrypted rooms work</td></tr>
+        <tr><td>RTC transports</td><td><code>curl …/.well-known/matrix/client</code> + Element Call</td><td><code>org.matrix.msc4143.rtc_foci</code> present; call connects</td></tr>
+        <tr><td>Rollback readiness</td><td>Inspect backup: DB snapshot + <code>backup/main-pre-1.8.2</code></td><td>Restorable copy exists dated before first 1.8.2 boot</td></tr>
+      </table>
+    </div>
+    <div class="loop">
+      🔁 <strong>The plan is not complete until every box is checked and every command passes. If for some reason a step is not possible to complete, mark it with [f] and move on if possible.</strong>
+    </div>
+  </section>
+
+  <!-- ===== NOTES ===== -->
+  <section id="notes">
+    <h2>Notes</h2>
+
+    <h3>Disposition of all 24 fork-only commits</h3>
+    <div class="table-scroll">
+      <table>
+        <tr><th>Fork commits</th><th>Feature</th><th>Disposition</th></tr>
+        <tr><td><code>82e674cc</code>, <code>375069a7</code>, <code>e38e4e50</code>, <code>d9bf8b73</code></td><td>MSC4326 / MSC4190 appservice devices</td><td>Already upstream (<code>7b60e906c</code>, <code>e60c176b1</code>, <code>58564f40c</code>, <code>1810279ce</code>) + 3 follow-up fixes fork lacks</td></tr>
+        <tr><td><code>73a8e175</code></td><td>Plaintext-room device-list sync</td><td>Already upstream (<code>0adec1e3a</code>)</td></tr>
+        <tr><td><code>10034aa4</code></td><td>MSC4108 QR login (rendezvous + OAuth AS)</td><td>Superseded: upstream rendezvous + native OIDC server</td></tr>
+        <tr><td><code>1d8b166e</code>, <code>879bdb19</code></td><td>MSC4143 rtc/transports</td><td>Superseded (<code>bbad352dc</code>); same config key</td></tr>
+        <tr><td><code>30aa9b94</code>, <code>b66e1915</code></td><td>OAuth authorization-code + PKCE + consent</td><td>Superseded: upstream <code>oidc_native_auth</code> server (more complete: JWKS, userinfo, account UI, persisted keys)</td></tr>
+        <tr><td><code>b20ad8a6</code></td><td>SSO registration inhibit</td><td>Is the merge-base — already upstream</td></tr>
+        <tr><td>13 CI commits (<code>f0e92a46</code>…<code>20e20b00</code>)</td><td>Fork CI + nix tini fix</td><td><strong>Keep</strong> — squashed to final state as 1–2 commits (Phase 2)</td></tr>
+      </table>
+    </div>
+
+    <div class="rejected">
+      <strong>Rejected: merge upstream/main into fork main.</strong> A merge would drag 24 fork commits' worth of superseded implementations through conflict resolution against their upstream replacements (device.rs was deleted-and-restructured; rendezvous file → directory; both sides register <code>/_matrix/client/v1/auth_metadata</code>, which panics axum at startup if both survive). Every conflict would be resolved by "take upstream" anyway — the rebuild encodes that decision once.
+    </div>
+    <div class="rejected">
+      <strong>Rejected: port the fork's OAuth provider onto 1.8.2.</strong> The porting map exists (route table, config, one DB map <code>oauthclient_metadata</code>, shared-file hunks), but upstream's native OIDC server is a strict functional superset with persisted signing keys, rate limiting, and an account-management UI — and the two cannot coexist on the MSC2965 discovery routes. Porting would preserve code, not functionality, at permanent maintenance cost. The fork's OAuth issues native Matrix tokens, so no user data is lost by switching: existing access/refresh tokens remain valid; clients only re-discover endpoints.
+    </div>
+    <div class="rejected">
+      <strong>Rejected: base on the v1.8.2 tag instead of upstream main tip.</strong> The tip (<code>adf1c0bd</code>, 133 commits past v1.8.2) carries the MSC4190 follow-ups, the MAS scope fix (#530), and soft-fail event-handler fixes. The fork has always tracked upstream <code>main</code> (the old merge-base is a main-line commit), and upstream cuts releases from it.
+    </div>
+
+    <h3>Risks &amp; residuals</h3>
+    <ul>
+      <li><strong>Irreversible first boot:</strong> four CFs dropped (<code>maps.rs</code>: <code>descriptor::DROPPED</code>); <code>DATABASE_VERSION</code> unchanged at 17 means no version gate stops an accidental binary rollback afterwards — the DB backup in Phase 6 is the only rollback path. <code>onetimekeyid_onetimekeys</code> loss is self-healing (clients re-upload OTKs) but backup first.</li>
+      <li><strong>Orphaned CF:</strong> the fork's <code>oauthclient_metadata</code> stays on disk, opened as <code>IGNORED</code> (<code>open.rs:97-187</code>) — harmless; can be cleaned later with an admin rebuild command if desired.</li>
+      <li><strong>OIDC server precondition:</strong> <code>oidc_native_auth</code> does nothing unless <code>well_known.client</code> is configured (<code>server.rs:86-90</code>) — the deployment sets it already (fork required the same for QR login), but verify in Phase 4.</li>
+      <li><strong>Upstream <code>main.yml</code> also triggers on all branch pushes</strong> — same as on 1.5.0; fork CI and upstream CI coexist under different concurrency groups. If upstream jobs fail on GitHub-hosted runners, that's pre-existing fork behavior, not a regression of this update.</li>
+      <li><strong>Config knobs lost:</strong> fork's OAuth TTL tunables became upstream constants; if the deployment relied on non-default values, the difference is behavioral (defaults: device grant 600s, poll 5s) — review during Phase 4.</li>
+    </ul>
+
+    <h3>Reference — research provenance</h3>
+    <p>Findings verified 2026-08-04 against upstream <code>adf1c0bd</code> (fetched via <code>git fetch https://github.com/matrix-construct/tuwunel.git main</code>) and fork branch <code>fix-appservice-e2ee-msc4190</code>. Key upstream anchors: <code>src/service/oauth/server.rs:81-102</code> (can_build), <code>src/core/config/mod.rs:1624,1732-1805</code> (oidc/rendezvous config), <code>src/api/router.rs:440-462</code> (oidc routes), <code>src/service/migrations/mod.rs:34</code> (DATABASE_VERSION), <code>src/database/engine/open.rs:97-187</code> (IGNORED CFs), <code>src/core/config/check.rs:711-734</code> (unknown-key warnings), upstream <code>flake.nix:61-69,293</code> (tini override without CMake fix; <code>oci-image</code> output). Fork anchors are cited inline in the Problem evidence block. Context7 enrichment was skipped: the plan introduces no new external libraries — all version pins (Rust 1.95.0, ruma/rocksdb git revs) are adopted wholesale from upstream's lockfiles.</p>
+  </section>
+
+  <!-- ===== AMENDMENTS ===== -->
+  <section id="amendments">
+    <h2>Amendments</h2>
+    <!-- Append-only: populated by Update workflows after execution begins. -->
+    <details>
+      <summary>2026-08-04 — Pre-update macOS baseline build failure</summary>
+      <p>The isolated baseline build at fork commit <code>b66e1915</code> failed on macOS before any update changes: <code>src/core/utils/sys/limits.rs</code> compiles Linux-only <code>RLIMIT_NPROC</code> handling under <code>cfg(unix)</code>, and <code>src/core/utils/sys/usage.rs</code> calls an unavailable <code>Usage::default()</code>. Execution proceeded because Phase 1 replaces that source tree with upstream <code>adf1c0bd</code>; the failure is retained here as pre-existing baseline evidence.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Phase 1 has no content commit</summary>
+      <p>Phase 1 changes only local and remote Git refs. No empty commit was created: the plan and diagrams remain part of Phase 2's single fork-CI commit, preserving the plan's acceptance bar of at most two commits above upstream.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Archive files restored from backup before move</summary>
+      <p>The upstream-based integration tree does not contain the fork-only root plans, so the literal <code>git mv</code> command had no source files. The two documents were first restored verbatim from <code>backup/main-pre-1.8.2</code>, then moved to <code>plans/archive/</code>, producing the planned archived artifacts without restoring their obsolete implementation code.</p>
+    </details>
+  </section>
+
+</main>
+</body>
+</html>
