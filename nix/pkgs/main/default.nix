@@ -149,6 +149,11 @@ let
     TUWUNEL_DATABASE_PATH = "/var/tmp/tuwunel.db";
   }
   // buildDepsOnlyEnv
+  // lib.optionalAttrs stdenv.hostPlatform.isDarwin {
+    # ThinLTO can emit function-pointer atoms with one-byte alignment. Modern
+    # ld64 rejects those when chained fixups are enabled.
+    NIX_LDFLAGS = "-no_fixup_chains";
+  }
   // {
     # Only needed in static stdenv because these are transitive dependencies of rocksdb
     CARGO_BUILD_RUSTFLAGS =
@@ -240,9 +245,9 @@ craneLib.buildPackage (
     buildInputs = (commonAttrs.buildInputs or [ ]) ++ [
       rocksdb'
     ];
-    nativeBuildInputs = (commonAttrs.nativeBuildInputs or [ ]) ++ [
-      autoPatchelfHook
-    ];
+    nativeBuildInputs =
+      (commonAttrs.nativeBuildInputs or [ ])
+      ++ lib.optional (!stdenv.hostPlatform.isDarwin) autoPatchelfHook;
     # The check phase runs the freshly built test binaries before
     # autoPatchelfHook rewrites their RPATH, so every shared library they
     # load must be reachable through LD_LIBRARY_PATH. rocksdb' covers the

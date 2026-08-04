@@ -16,7 +16,7 @@ use http::{HeaderValue, header};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tuwunel_core::{Server, err};
 
-use self::handler::RouterExt;
+use self::handler::{RouterExt, RumaHandler};
 pub(super) use self::{
 	args::Args as Ruma, auth::auth_uiaa, client_ip::ClientIp, response::RumaResponse,
 	state::State,
@@ -408,11 +408,14 @@ fn register_client_media_and_device_routes(router: Router<State>) -> Router<Stat
 }
 
 fn register_client_misc_routes(router: Router<State>) -> Router<State> {
+	let router =
+		client::get_transports_route.add_route(router, "/_matrix/client/v1/rtc/transports");
+
 	router
 		.ruma_route(&client::turn_server_route)
 		.ruma_route(&client::get_transports_route)
 		.ruma_route(&client::well_known_support)
-		.ruma_route(&client::well_known_client)
+		.route("/.well-known/matrix/client", get(client::well_known_client))
 		.ruma_route(&client::tuwunel_remote_version)
 		.route("/_tuwunel/server_version", get(client::tuwunel_server_version))
 		.route(
@@ -595,4 +598,20 @@ async fn legacy_media_disabled() -> impl IntoResponse {
 
 async fn federation_disabled() -> impl IntoResponse {
 	err!(Request(Forbidden("Federation is disabled.")))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	async fn duplicate_handler() {}
+
+	#[test]
+	#[should_panic(expected = "Overlapping method route. Handler for `GET \
+	                           /_matrix/client/v1/rtc/transports` already exists")]
+	fn stable_rtc_transports_alias_is_registered() {
+		let router = register_client_misc_routes(Router::new());
+
+		_ = router.route("/_matrix/client/v1/rtc/transports", get(duplicate_handler));
+	}
 }

@@ -1,6 +1,9 @@
 #![cfg(test)]
 
-use std::{env::var, fs::remove_dir_all, path::PathBuf, process::id as process_id, sync::Arc};
+use std::{
+	env::var, fs::remove_dir_all, path::PathBuf, process::id as process_id, sync::Arc,
+	time::Duration,
+};
 
 use tuwunel::{Args, Runtime, Server, async_run, async_start, async_stop};
 use tuwunel_core::{
@@ -91,13 +94,15 @@ async fn exercise(services: &Services) -> Result {
 		return Err!("empty state diff did not load as one empty layer");
 	}
 
-	if !services.globals.pending_count().is_empty() {
-		return Err!("successful allocation left a count permit pending");
-	}
+	wait_for_retirement(services, shortstatehash, "successful allocation").await?;
 
+	let mut failed_shortstatehash = None;
 	let failure = services
 		.short
-		.get_or_create_shortstatehash(&FAILURE_HASH, |_, _| Err!("deliberate state diff failure"))
+		.get_or_create_shortstatehash(&FAILURE_HASH, |_, shortstatehash| {
+			failed_shortstatehash = Some(shortstatehash);
+			Err!("deliberate state diff failure")
+		})
 		.await;
 
 	if failure.is_ok() {
@@ -113,9 +118,10 @@ async fn exercise(services: &Services) -> Result {
 		return Err!("failure callback published the state hash mapping");
 	}
 
-	if !services.globals.pending_count().is_empty() {
-		return Err!("failure callback left a count permit pending");
-	}
+	let Some(failed_shortstatehash) = failed_shortstatehash else {
+		return Err!("failure callback did not receive a state hash allocation");
+	};
+	wait_for_retirement(services, failed_shortstatehash, "failure callback").await?;
 
 	let (existing, already_existed) = services
 		.short
@@ -144,6 +150,23 @@ async fn exercise(services: &Services) -> Result {
 
 	if state.shortstatehash != appended || state.full_state.len() != 1 {
 		return Err!("appended state event was not loaded");
+	}
+
+	Ok(())
+}
+
+async fn wait_for_retirement(services: &Services, count: u64, context: &str) -> Result {
+	let retired =
+		match tokio::time::timeout(Duration::from_secs(5), services.globals.wait_count(&count))
+			.await
+		{
+			| Ok(retired) => retired?,
+			| Err(_) =>
+				return Err!("{context} did not retire count {count} within five seconds"),
+		};
+
+	if retired < count {
+		return Err!("{context} retired only through count {retired}; expected at least {count}");
 	}
 
 	Ok(())

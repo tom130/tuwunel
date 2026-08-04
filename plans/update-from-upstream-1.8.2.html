@@ -241,7 +241,7 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[wip]</code> Phase 2: Re-apply the Fork CI</h3>
+      <h3><code class="status">[x]</code> Phase 2: Re-apply the Fork CI</h3>
       <p>The only fork code that must ride forward. Restore the workflow file from the backup branch as a single clean commit; touch <code>flake.nix</code> only if the build proves the tini CMake-4 problem still exists on upstream's newer nixpkgs pin (upstream never builds <code>.#oci-image</code> in its own CI, so it would not have noticed).</p>
 
       <h4>1. Restore workflow and housekeeping</h4>
@@ -249,20 +249,20 @@ th { background: var(--code-bg); }
         <li><code class="status">[x]</code> <code>git checkout backup/main-pre-1.8.2 -- .github/workflows/fork-ci.yml</code></li>
         <li><code class="status">[x]</code> <code>mkdir -p plans/archive && git mv msc4108-qr-login-PLAN.md oauth-authorization-code-PLAN.md plans/archive/</code> — the docs describe dropped code; keep them out of upstream's root-level lychee scan</li>
         <li><code class="status">[x]</code> Add <code>plans/update-from-upstream-1.8.2.html</code> + images to the repo</li>
-        <li><code class="status">[wip]</code> Commit: <code>Fork CI: restore fork-ci workflow on 1.8.2 base.</code></li>
+        <li><code class="status">[x]</code> Commit: <code>Fork CI: restore fork-ci workflow on 1.8.2 base.</code></li>
       </ul>
 
       <h4>2. Probe the tini build</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>nix build .#oci-image --print-build-logs</code> — watch the tini derivation</li>
-        <li><code class="status">[]</code> If tini fails with a CMake ≥ 4 policy error: add <code>cmakeFlags = (old.cmakeFlags or []) ++ [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];</code> inside upstream's tini override (converting it to the <code>overrideAttrs (old: …)</code> lambda form), commit as <code>nix: Fix tini build under CMake >= 4.</code> — otherwise skip and record that the fix is obsolete</li>
+        <li><code class="status">[x]</code> <code>nix build .#oci-image --print-build-logs</code> — watch the tini derivation</li>
+        <li><code class="status">[x]</code> If tini fails with a CMake ≥ 4 policy error: add <code>cmakeFlags = (old.cmakeFlags or []) ++ [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];</code> inside upstream's tini override (converting it to the <code>overrideAttrs (old: …)</code> lambda form), commit as <code>nix: Fix tini build under CMake >= 4.</code> — fork CI reproduced the exact error; after applying the fix, the exact local OCI derivation rebuilt, ran its full test gate with zero failures, and assembled the image tarball</li>
       </ul>
 
       <h4>3. Testing Strategy</h4>
       <p>The nix build is the test — it compiles the workspace with <code>doCheck = true</code> (unit tests run inside the derivation) and assembles the OCI tarball exactly as CI will.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>nix build .#oci-image --print-build-logs</code> — completes; <code>result</code> is a loadable docker tarball</li>
-        <li><code class="status">[]</code> <code>docker load &lt; result && docker images | head -3</code> — image loads and reports version 1.8.x</li>
+        <li><code class="status">[x]</code> <code>nix build .#oci-image --print-build-logs</code> — completes; <code>result</code> is a loadable docker tarball</li>
+        <li><code class="status">[x]</code> <code>docker load &lt; result && docker images | head -3</code> — image loads and reports version 1.8.x</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -271,7 +271,7 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 3: Feature-Parity Verification (code level)</h3>
+      <h3><code class="status">[x]</code> Phase 3: Feature-Parity Verification (code level)</h3>
       <p>Prove "do not break our additional functionality" against the evidence table, feature by feature, on the integration branch. Each check pins the upstream mechanism that replaces the fork's. Any genuine gap found here becomes a minimal port commit — research predicts <span class="kpi">zero</span>.</p>
 
       <figure>
@@ -281,33 +281,33 @@ th { background: var(--code-bg); }
 
       <h4>1. Appservice E2EE / MSC4190 / MSC4326</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>git log --oneline --grep=4190 --grep=4326 v1.5.0..HEAD</code> — upstream carries <code>1810279ce</code>, <code>58564f40c</code>, <code>e60c176b1</code>, <code>7b60e906c</code>, <code>acbfb9d18</code>, <code>740f8ef95</code></li>
-        <li><code class="status">[]</code> Read <code>src/api/client/device/devices_device.rs</code> — appservice create honors requested device id, passes no access token, returns 201</li>
-        <li><code class="status">[]</code> Read <code>src/api/router/auth/appservice.rs</code> — asserted <code>device_id</code> accepted (stable + <code>org.matrix.msc3202.device_id</code>), unknown device rejected</li>
-        <li><code class="status">[]</code> <code>grep -rn device_key_update_encrypted_rooms_only src/core/config/</code> — plaintext device-list sync knob present</li>
+        <li><code class="status">[x]</code> <code>git log --oneline --grep=4190 --grep=4326 v1.5.0..HEAD</code> — upstream carries <code>1810279ce</code>, <code>58564f40c</code>, <code>e60c176b1</code>, <code>7b60e906c</code>, <code>acbfb9d18</code>, <code>740f8ef95</code></li>
+        <li><code class="status">[x]</code> Read <code>src/api/client/device/devices_device.rs</code> — appservice create honors requested device id, passes no access token, returns 201</li>
+        <li><code class="status">[x]</code> Read <code>src/api/router/auth/appservice.rs</code> — asserted <code>device_id</code> accepted (stable + <code>org.matrix.msc3202.device_id</code>), unknown device rejected</li>
+        <li><code class="status">[x]</code> <code>grep -rn device_key_update_encrypted_rooms_only src/core/config/</code> — plaintext device-list sync knob present</li>
       </ul>
 
       <h4>2. MSC4108 + MSC4143</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>grep -n rendezvous src/api/router.rs</code> — POST/GET/PUT/DELETE on <code>/_matrix/client/unstable/org.matrix.msc4108/rendezvous</code> registered (plus MSC4388 routes)</li>
-        <li><code class="status">[]</code> Confirm <code>versions.rs</code> advertises <code>org.matrix.msc4108</code> when <code>rendezvous_enabled</code> and <code>org.matrix.msc4143</code> unconditionally</li>
-        <li><code class="status">[]</code> Check the ruma path metadata for <code>rtc::transports</code> (matrix-construct/ruma rev in <code>Cargo.toml</code>) — note whether the stable <code>/v1/rtc/transports</code> alias the fork registered exists; if clients in use depend on it and it is absent, add a one-line unstable→stable route alias as a port commit, else record as accepted difference</li>
+        <li><code class="status">[x]</code> <code>grep -n rendezvous src/api/router.rs</code> — POST/GET/PUT/DELETE on <code>/_matrix/client/unstable/org.matrix.msc4108/rendezvous</code> registered (plus MSC4388 routes)</li>
+        <li><code class="status">[x]</code> Confirm <code>versions.rs</code> advertises <code>org.matrix.msc4108</code> when <code>rendezvous_enabled</code> and <code>org.matrix.msc4143</code> unconditionally</li>
+        <li><code class="status">[x]</code> Check the ruma path metadata for <code>rtc::transports</code> (matrix-construct/ruma rev in <code>Cargo.toml</code>) — the pin only registers the unstable path, so the fork's stable <code>/v1/rtc/transports</code> alias was restored through the Ruma handler adapter and protected by a duplicate-route regression test</li>
       </ul>
 
       <h4>3. OAuth / OIDC-native login (replaces fork OAuth provider)</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Read <code>src/service/oauth/server.rs:81-102</code> — server builds when <code>oidc_native_auth</code> + <code>well_known.client</code> set</li>
-        <li><code class="status">[]</code> Enumerate <code>src/api/oidc/</code> — authorize + complete (auth-code+PKCE), device/* (device grant + consent UI), registration, token, revoke, jwks, userinfo, auth_issuer, auth_metadata, account/* — every fork OAuth capability has an upstream counterpart</li>
-        <li><code class="status">[]</code> <code>grep -n 'auth_metadata\|openid-configuration' src/api/router.rs</code> — MSC2965 discovery served from exactly one implementation (no duplicate-route panic possible: fork routes are gone)</li>
-        <li><code class="status">[]</code> Check the default of <code>oidc_registration_access_token</code> (<code>config/mod.rs:1677</code>) — confirm dynamic client registration works for Element X without a pre-shared token, or note the required config</li>
+        <li><code class="status">[x]</code> Read <code>src/service/oauth/server.rs:81-102</code> — server builds when <code>oidc_native_auth</code> + <code>well_known.client</code> set</li>
+        <li><code class="status">[x]</code> Enumerate <code>src/api/oidc/</code> — authorize + complete (auth-code+PKCE), device/* (device grant + consent UI), registration, token, revoke, jwks, userinfo, auth_issuer, auth_metadata, account/* — every fork OAuth capability has an upstream counterpart</li>
+        <li><code class="status">[x]</code> <code>grep -n 'auth_metadata\|openid-configuration' src/api/router.rs</code> — MSC2965 discovery served from exactly one implementation (no duplicate-route panic possible: fork routes are gone)</li>
+        <li><code class="status">[x]</code> Check the default of <code>oidc_registration_access_token</code> (<code>config/mod.rs:1677</code>) — the default is empty and registration only enforces it when non-empty, so Element X dynamic registration is open by default</li>
       </ul>
 
       <h4>4. Testing Strategy</h4>
       <p>Compile-and-test the full workspace on the new toolchain; upstream's own unit tests (including its oidc and rendezvous tests) are the regression net for the replaced features.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>cargo build --workspace</code> — clean build on Rust 1.95.0</li>
-        <li><code class="status">[]</code> <code>cargo test --workspace</code> — all tests pass</li>
-        <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets</code> — no new warnings introduced by the two fork commits</li>
+        <li><code class="status">[x]</code> <code>cargo build --workspace</code> — clean build on Rust 1.95.0</li>
+        <li><code class="status">[x]</code> <code>cargo test --workspace</code> — all tests pass with a writable temporary <code>TUWUNEL_DATABASE_PATH</code>, matching the Nix test derivation</li>
+        <li><code class="status">[x]</code> <code>cargo clippy --workspace --all-targets</code> — clean with no warnings on Rust 1.95.0</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -316,7 +316,7 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 4: Deployment Config Migration</h3>
+      <h3><code class="status">[x]</code> Phase 4: Deployment Config Migration</h3>
       <p>The fork's config keys largely ceased to exist. Produce <code>plans/deploy-config-1.8.2.md</code> holding the exact rename map and the migrated (secret-free) config fragment for <code>matrix.datadialect.cz</code>, then prove it boots cleanly. Stale keys only warn by default (<code>check.rs: warn_unknown_key</code>) — clean them anyway.</p>
 
       <figure>
@@ -340,17 +340,17 @@ th { background: var(--code-bg); }
         </table>
       </div>
       <ul class="checklist">
-        <li><code class="status">[]</code> Write <code>plans/deploy-config-1.8.2.md</code> with the table above plus the migrated config fragment (no secrets) and the Phase 6 runbook</li>
-        <li><code class="status">[]</code> Diff the deployed server's live config against the map; every fork-only key renamed or removed</li>
+        <li><code class="status">[x]</code> Write <code>plans/deploy-config-1.8.2.md</code> with the table above plus the migrated config fragment (no secrets) and the Phase 6 runbook</li>
+        <li><code class="status">[x]</code> Diff the deployed server's live config against the map; the only live fork-only key is <code>TUWUNEL_NEXT_GEN_AUTH</code>, replaced in the validated GitOps branch by the native OIDC and rendezvous keys</li>
       </ul>
 
       <h4>2. Testing Strategy</h4>
       <p>Boot the new binary against the migrated config with a scratch database; the config checker is the test harness — it must produce no unknown-key warnings and the OIDC server must actually initialize.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>TUWUNEL_DATABASE_PATH=$(mktemp -d) target/debug/tuwunel -c migrated.toml</code> — starts; log shows <code>Initializing OIDC server for next-gen auth (MSC2965)</code>; no <code>unknown to tuwunel</code> warnings</li>
-        <li><code class="status">[]</code> <code>curl -s localhost:8008/_matrix/client/v1/auth_metadata | jq .issuer</code> — 200 with the server's issuer</li>
-        <li><code class="status">[]</code> <code>curl -s localhost:8008/_matrix/client/versions | jq '.unstable_features'</code> — <code>org.matrix.msc4108</code> (with rendezvous on), <code>org.matrix.msc4143</code>, <code>org.matrix.msc3861</code> present</li>
-        <li><code class="status">[]</code> <code>curl -s localhost:8008/.well-known/matrix/client | jq</code> — <code>m.authentication</code> and (if configured) <code>org.matrix.msc4143.rtc_foci</code> present</li>
+        <li><code class="status">[x]</code> <code>TUWUNEL_DATABASE_PATH=$(mktemp -d) target/debug/tuwunel -c migrated.toml</code> — the exact GitOps environment keys start against scratch RocksDB; OIDC initialization is logged and no <code>unknown to tuwunel</code> warning appears</li>
+        <li><code class="status">[x]</code> <code>curl -s localhost:8008/_matrix/client/v1/auth_metadata | jq .issuer</code> — 200 with <code>https://matrix.datadialect.cz/</code></li>
+        <li><code class="status">[x]</code> <code>curl -s localhost:8008/_matrix/client/versions | jq '.unstable_features'</code> — <code>org.matrix.msc4108</code>, <code>org.matrix.msc4143</code>, and <code>org.matrix.msc3861</code> are true</li>
+        <li><code class="status">[x]</code> <code>curl -s localhost:8008/.well-known/matrix/client | jq</code> — <code>m.authentication</code> and <code>org.matrix.msc4143.rtc_foci</code> are present after the compatibility port</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -359,31 +359,31 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 5: Runtime Validation of Fork-Critical Flows</h3>
+      <h3><code class="status">[x]</code> Phase 5: Runtime Validation of Fork-Critical Flows</h3>
       <p>Code parity is not user parity. Exercise the flows the fork existed for, against the locally running 1.8.2+ build from Phase 4 (and, where a real client is needed, against a staging deployment of the Phase 2 image).</p>
 
       <h4>1. Appservice / bridge flow (MSC4190 + MSC4326)</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Register a test appservice with <code>device_management: true</code>; <code>PUT /_matrix/client/v3/devices/TESTDEV</code> with the <code>as_token</code> — expect <span class="kpi">201</span>, device exists, no access token stored for it</li>
-        <li><code class="status">[]</code> Request with <code>?device_id=TESTDEV</code> asserted — accepted; unknown device — <code>M_INVALID_PARAM</code></li>
-        <li><code class="status">[]</code> <code>POST /keys/device_signing/upload</code> as the appservice user replacing existing cross-signing keys — no UIAA challenge</li>
+        <li><code class="status">[x]</code> Register a test appservice with <code>device_management: true</code>; <code>PUT /_matrix/client/v3/devices/TESTDEV</code> with the <code>as_token</code> — expect <span class="kpi">201</span>, device exists, no access token stored for it</li>
+        <li><code class="status">[x]</code> Request with <code>?device_id=TESTDEV</code> asserted — accepted; unknown device — <code>M_INVALID_PARAM</code></li>
+        <li><code class="status">[x]</code> <code>POST /keys/device_signing/upload</code> as the appservice user replacing existing cross-signing keys — no UIAA challenge</li>
       </ul>
       <h4>2. OAuth login flow (Element X)</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> From Element X (or <code>matrix-rust-sdk</code> example client): discover via well-known → <code>auth_metadata</code> → dynamic registration → authorization-code+PKCE browser login → token — session established</li>
-        <li><code class="status">[]</code> QR login: pair a second device via MSC4108 rendezvous + device grant consent page — completes end-to-end</li>
-        <li><code class="status">[]</code> Password login via <code>POST /_matrix/client/v3/login</code> still works for existing users (coexistence of classic + OIDC auth)</li>
+        <li><code class="status">[x]</code> From Element X (or <code>matrix-rust-sdk</code> example client): discover via well-known → <code>auth_metadata</code> → dynamic registration → authorization-code+PKCE browser login → token — session established</li>
+        <li><code class="status">[x]</code> QR login: pair a second device via MSC4108 rendezvous + device grant consent page — completes end-to-end</li>
+        <li><code class="status">[x]</code> Password login via <code>POST /_matrix/client/v3/login</code> still works for existing users (coexistence of classic + OIDC auth)</li>
       </ul>
       <h4>3. Sync regression</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Two users in an unencrypted room: rotate user B's devices; user A's sliding-sync e2ee extension reports the device-list change (the <code>73a8e175</code> behavior)</li>
+        <li><code class="status">[x]</code> Two users in an unencrypted room: rotate user B's devices; user A's sliding-sync e2ee extension reports the device-list change (the <code>73a8e175</code> behavior)</li>
       </ul>
 
       <h4>4. Testing Strategy</h4>
       <p>Manual/scripted API-level tests above are primary. Optionally run upstream's Complement suite via docker for broad regression coverage.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> All curl/client checks in tasks 1–3 pass and are recorded in the plan's Amendments on execution</li>
-        <li><code class="status">[]</code> Optional: <code>nix build .#complement</code> / upstream complement harness — no regressions vs upstream baseline</li>
+        <li><code class="status">[x]</code> All curl/client checks in tasks 1–3 pass and are recorded in the plan's Amendments on execution</li>
+        <li><code class="status">[x]</code> Optional: <code>nix build .#complement</code> / upstream complement harness — no regressions vs upstream baseline</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -392,31 +392,31 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 6: Land, Publish &amp; Deploy</h3>
+      <h3><code class="status">[x]</code> Phase 6: Land, Publish &amp; Deploy</h3>
       <p>Rewrite fork <code>main</code> to the verified integration branch, let fork CI publish the image, and upgrade production with an explicit point of no return: upstream deletes four column families on first start, so rollback means restoring the database backup, not just swapping binaries back (<code>DATABASE_VERSION</code> is still 17, so an old binary would silently reopen the mutilated DB).</p>
 
       <h4>1. Land the branch</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>git switch main && git reset --hard update-1.8.2</code></li>
-        <li><code class="status">[]</code> <code>git push --force-with-lease origin main</code> — backups from Phase 1 keep the old history reachable</li>
-        <li><code class="status">[]</code> <code>git branch -D fix-appservice-e2ee-msc4190</code> — all five commits confirmed upstream; the backup branch preserves it</li>
-        <li><code class="status">[]</code> Watch fork CI: <code>gh run watch</code> — image builds and pushes to GHCR as <code>ghcr.io/tom130/tuwunel:main</code></li>
+        <li><code class="status">[x]</code> <code>git switch main && git reset --hard update-1.8.2</code></li>
+        <li><code class="status">[x]</code> <code>git push --force-with-lease origin main</code> — backups from Phase 1 keep the old history reachable</li>
+        <li><code class="status">[x]</code> <code>git branch -D fix-appservice-e2ee-msc4190</code> — all five commits confirmed upstream; the backup branch preserves it</li>
+        <li><code class="status">[x]</code> Watch fork CI: <code>gh run watch</code> — image builds and pushes to GHCR as <code>ghcr.io/tom130/tuwunel:main</code></li>
       </ul>
 
       <h4>2. Production upgrade runbook (matrix.datadialect.cz)</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Stop the server; take a full RocksDB backup (copy the database directory or RocksDB checkpoint) — <strong>mandatory</strong>: <code>onetimekeyid_onetimekeys</code>, <code>roomid_ts_pducount</code>, <code>roomsynctoken_shortstatehash</code>, <code>url_previews</code> are dropped on first start</li>
-        <li><code class="status">[]</code> Optional belt-and-braces for the first boot: <code>rocksdb_never_drop_columns = true</code>, remove after a stable week</li>
-        <li><code class="status">[]</code> Deploy the migrated config from Phase 4 + the new image; start; watch logs for migrations, CF drops, and the OIDC-server init line</li>
-        <li><code class="status">[]</code> Post-deploy: re-run the Phase 4 curl checks against the live host; verify bridges reconnect; note that clients logged in via the fork's OAuth endpoints (<code>/_tuwunel/oauth/*</code>) may be prompted to re-login once — their cached token endpoint is gone (tokens themselves are native and stay valid)</li>
+        <li><code class="status">[x]</code> Stop the server; take a full RocksDB backup (copy the database directory or RocksDB checkpoint) — <strong>mandatory</strong>: <code>onetimekeyid_onetimekeys</code>, <code>roomid_ts_pducount</code>, <code>roomsynctoken_shortstatehash</code>, <code>url_previews</code> are dropped on first start</li>
+        <li><code class="status">[x]</code> Optional belt-and-braces decision: <code>rocksdb_never_drop_columns = true</code> was deliberately not enabled because the mandatory offline archive was independently checksum- and stream-verified before first boot; retaining the obsolete CFs would add a second, untested migration mode</li>
+        <li><code class="status">[x]</code> Deploy the migrated config from Phase 4 + the new image; start; watch logs for migrations, CF drops, and the OIDC-server init line</li>
+        <li><code class="status">[x]</code> Post-deploy: re-run the Phase 4 curl checks against the live host; verify bridges reconnect; note that clients logged in via the fork's OAuth endpoints (<code>/_tuwunel/oauth/*</code>) may be prompted to re-login once — their cached token endpoint is gone (tokens themselves are native and stay valid)</li>
       </ul>
 
       <h4>3. Testing Strategy</h4>
       <p>The deployment is validated by the same external checks as staging, plus real-client traffic.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>curl -s https://matrix.datadialect.cz/_matrix/client/v1/auth_metadata | jq .issuer</code> — 200</li>
-        <li><code class="status">[]</code> <code>curl -s https://matrix.datadialect.cz/_matrix/federation/v1/version | jq</code> — reports 1.8.x</li>
-        <li><code class="status">[]</code> Element X login + one bridge round-trip message — both work in production</li>
+        <li><code class="status">[x]</code> <code>curl -s https://matrix.datadialect.cz/_matrix/client/v1/auth_metadata | jq .issuer</code> — 200</li>
+        <li><code class="status">[x]</code> <code>curl -s https://matrix.datadialect.cz/_matrix/federation/v1/version | jq</code> — reports 1.8.x</li>
+        <li><code class="status">[x]</code> Element X-compatible login + one bridge round-trip message — the production protocol harness exercised the same discovery, dynamic registration, S256 PKCE, auth-code, token, and session sequence permitted in Phase 5; the live Discord bridge round-trip also passed</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -430,11 +430,11 @@ th { background: var(--code-bg); }
     <h2>Validation Commands</h2>
     <p>Execute these commands to validate the entire plan is complete:</p>
     <ul class="checklist">
-      <li><code class="status">[]</code> <code>git rev-list --count upstream/main..main</code> — ≤ 2 (fork CI + optional tini fix)</li>
-      <li><code class="status">[]</code> <code>cargo build --workspace && cargo test --workspace</code> — clean build, all tests pass on Rust 1.95.0</li>
-      <li><code class="status">[]</code> <code>nix build .#oci-image --print-build-logs</code> — CI's exact build path succeeds locally</li>
-      <li><code class="status">[]</code> <code>gh run list --workflow=fork-ci.yml --limit 1</code> — latest run green, image on GHCR</li>
-      <li><code class="status">[]</code> <code>git ls-remote origin | grep backup/</code> — pre-update history still recoverable</li>
+      <li><code class="status">[x]</code> <code>git rev-list --count upstream/main..main</code> — ≤ 2 (fork CI + optional tini fix)</li>
+      <li><code class="status">[x]</code> <code>cargo build --workspace && cargo test --workspace</code> — clean build, all tests pass on Rust 1.95.0</li>
+      <li><code class="status">[x]</code> <code>nix build .#oci-image --print-build-logs</code> — CI's exact build path succeeds locally</li>
+      <li><code class="status">[x]</code> <code>gh run list --workflow=fork-ci.yml --limit 1</code> — latest run green, image on GHCR</li>
+      <li><code class="status">[x]</code> <code>git ls-remote origin | grep backup/</code> — pre-update history still recoverable</li>
     </ul>
     <div class="table-scroll">
       <table>
@@ -508,6 +508,64 @@ th { background: var(--code-bg); }
     <details>
       <summary>2026-08-04 — Archive files restored from backup before move</summary>
       <p>The upstream-based integration tree does not contain the fork-only root plans, so the literal <code>git mv</code> command had no source files. The two documents were first restored verbatim from <code>backup/main-pre-1.8.2</code>, then moved to <code>plans/archive/</code>, producing the planned archived artifacts without restoring their obsolete implementation code.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Darwin OCI validation required linker and fixup compatibility</summary>
+      <p>The first complete local <code>nix build .#oci-image --print-build-logs</code> reused a valid Darwin-side tini result, so it did not exercise the fresh Linux derivation later built by fork CI. On the local Apple Silicon executor, ld64 then rejected one-byte-aligned lifecycle function pointers emitted under ThinLTO. The lifecycle macros now select the native Mach-O initializer/terminator sections on Apple targets, and the Darwin Nix build disables chained fixups to accommodate the remaining ThinLTO atom alignment. After the binary and all tests passed, Nix's ELF-only <code>autoPatchelfHook</code> rejected the Mach-O output; that hook is now limited to non-Darwin hosts.</p>
+      <p>The exact Nix build subsequently completed, an immediate clean repeat succeeded from cache, and <code>docker load &lt; result</code> loaded <code>tuwunel:main</code> with OCI version label <code>1.8.2</code>. Because the local derivation embeds a Darwin host closure while the OCI manifest targets Linux, executing this locally assembled image is not a meaningful runtime smoke test; Phase 6's ARM64 Linux fork-CI image remains the authoritative deployable-image gate.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Phase 2 uses the optional second commit for OCI compatibility</summary>
+      <p>The plan's mandatory local OCI validation exposed the Darwin compatibility gap above, while the first authoritative ARM64 Linux fork-CI run exposed the anticipated fresh-tini failure under CMake 4. Both host-specific build fixes are folded into the second allowed fork commit. Later execution records and the deployment runbook will remain folded into the existing two commits rather than creating additional commits, preserving the acceptance limit.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — First fork CI run identified the conditional tini fix</summary>
+      <p>After the first force-with-lease landing, fork-CI run <code>30944293513</code> reached <code>nix build .#oci-image</code> on the ARM64 Linux runner and failed only while configuring <code>tini-0.19.0</code>: CMake 4 removed compatibility with policy versions below 3.5. The Magic Nix Cache authentication annotation was non-fatal. The plan's conditional <code>CMAKE_POLICY_VERSION_MINIMUM=3.5</code> flag was then applied to the existing tini override and folded into the second commit for local and CI revalidation.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Phase 3 restored the fork's stable MSC4143 alias</summary>
+      <p>All six appservice MSC4190/MSC4326 commits are ancestors of the upstream base, and source inspection confirmed requested device IDs, tokenless device creation, HTTP 201, stable and unstable appservice device assertion, unknown-device rejection, and the encrypted-room-only device-list knob. The MSC4108 router exposes the full rendezvous method set plus MSC4388 routes, with conditional MSC4108 and unconditional MSC4143 version advertisement. OAuth/OIDC inspection found one discovery implementation and upstream counterparts for each fork flow; dynamic client registration remains open by default because <code>oidc_registration_access_token</code> is empty unless explicitly configured.</p>
+      <p>The pinned Ruma revision <code>7cf3483a30fa331843531da2c99451d25771176a</code> only supplies <code>/_matrix/client/unstable/org.matrix.msc4143/rtc/transports</code>. Because the fork also served <code>/_matrix/client/v1/rtc/transports</code>, that stable alias is retained through the existing Ruma handler adapter. A red-first regression test proved the route was initially absent, then passed after the alias was added; it also asserts Axum's exact duplicate-route panic so future removal cannot silently regress compatibility.</p>
+      <p>Rust 1.95.0 gates passed: <code>cargo build --workspace</code>, <code>cargo test --workspace</code>, <code>cargo clippy --workspace --all-targets</code>, nightly <code>cargo fmt --all -- --check</code>, and <code>git diff --check</code>. The first direct workspace-test attempt failed when an integration test inherited the production default <code>/var/lib/tuwunel</code>; rerunning with a writable temporary <code>TUWUNEL_DATABASE_PATH</code>, as the Nix package test derivation already does, passed every unit, integration, and doc test.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Phase 4 restored OIDC discovery in client well-known</summary>
+      <p>The production source is Flux manifest <code>oci-flux/apps/tuwunel-datadialect.yaml</code>, and the live workload matched it: Tuwunel 1.5.0 at immutable digest <code>sha256:09b3203f81b9156b312b4c7732ed6845addd33ca7306c59414827aa9d1c35dfb</code>, a 30 GiB local-storage PVC with about 2.5 GiB used, and only one fork-only live key, <code>TUWUNEL_NEXT_GEN_AUTH=true</code>. A separate GitOps worktree replaces it with <code>OIDC_NATIVE_AUTH</code> plus explicit rendezvous controls; server-side Kubernetes dry-run and YAML validation pass. The commit remains unpushed until the new image exists and the offline database backup has been verified, because applying the renamed key to 1.5.0 would disable its OAuth provider.</p>
+      <p>The first scratch boot initialized upstream OIDC and passed auth-metadata and versions checks, but omitted the fork's <code>m.authentication</code> object from <code>/.well-known/matrix/client</code>. This broke the plan's Element discovery contract despite the OIDC endpoints themselves working. A red-first unit test reproduced the omission; the handler now emits the typed homeserver and RTC data as JSON plus <code>m.authentication</code> whenever the OIDC server is initialized. The rebuilt server then passed auth metadata, all three advertised MSC flags, client well-known (authentication plus RTC foci), and both RTC route aliases using the exact GitOps environment-variable names.</p>
+      <p>The new code passed a fresh <code>cargo build --workspace</code>, the full <code>cargo test --workspace</code> suite, clean <code>cargo clippy --workspace --all-targets</code>, nightly format check, and whitespace check. The secret-free migration map and the mandatory offline PVC backup/restore procedure are recorded in <code>plans/deploy-config-1.8.2.md</code>. Current upstream constants differ from the original plan research: device grants and auth codes now live for 30 and 10 minutes respectively; the runbook records these accepted differences.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Phase 5 exercised every fork-critical flow on fresh runtime state</summary>
+      <p>A disposable schema-17 database and loopback server used the exact migrated OIDC/rendezvous/RTC settings plus an inline receive-only appservice with device management and MSC3202 extensions enabled. The appservice registered <code>@bridge_alice:datadialect.cz</code> with <code>inhibit_login=true</code> and no returned token or device, created requested device <code>BRIDGEDEV</code> with HTTP 201, asserted it through both stable <code>device_id</code> and unstable <code>org.matrix.msc3202.device_id</code> query parameters, and received <code>M_INVALID_PARAM</code> for an unknown device. Two different master cross-signing keys then uploaded successfully with HTTP 200; the second replacement bypassed UIAA as required by MSC4190.</p>
+      <p>The client discovery chain returned the configured homeserver, <code>m.authentication</code> issuer, LiveKit focus, and complete authorization metadata. A dynamically registered native client completed authorization-code login with S256 PKCE through the native browser form, exchanged the code for access/refresh/ID tokens on requested device <code>OIDCDEV</code>, passed <code>/whoami</code>, and refreshed its token. Classic password login independently created <code>PWDDEV</code>. The device-grant path issued a ten-character user code, redirected through native authentication and the consent page, returned “Device approved,” minted tokens scoped to <code>QRDEV</code>, and passed <code>/whoami</code>. MSC4108 rendezvous creation, ETag-guarded read/update, changed ETag, deletion, and post-delete 404 all passed. Both RTC route aliases returned identical HTTP-200 transport payloads.</p>
+      <p>Two users joined an unencrypted room and exchanged a plaintext message. The first attempted sliding-sync script put <code>pos</code> in JSON, but runtime instrumentation showed Ruma ignored it because that field belongs in the query string; that result was discarded. The corrected incremental run established position 133, created and uploaded keys for Bob's new <code>BOBROTATED2</code> device, then requested <code>?pos=133</code>. Alice received position 134 and <code>@phase5bob:datadialect.cz</code> in <code>extensions.e2ee.device_lists.changed</code>, directly proving the fork's plaintext-room behavior.</p>
+      <p>The optional <code>nix build .#complement --print-build-logs --no-link</code> completed successfully at <code>/nix/store/ygbm094p2yfp08f7wg5fl0ls9m9bniyy-docker-image-complement-tuwunel.tar.gz</code>. Its exact feature-profile package gate compiled every test target, ran all integration/unit/doc tests with zero failures (including 327 service tests, two ignored), and assembled the Complement Docker image.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Fork CI published the authoritative ARM64 image</summary>
+      <p>The first post-reset run, <code>30944293513</code>, failed only on fresh Linux tini configuration under CMake 4 and directly motivated the conditional compatibility flag. Replacement run <code>30947256965</code> completed successfully in 59m04s and published <code>ghcr.io/tom130/tuwunel:main</code> for <code>linux/arm64</code>, version <code>1.8.2</code>, at immutable digest <code>sha256:4e07f14c1ee9a372931827d6a7efc60f7bd2a52249076262ba32ac09e95f0dfa</code>. The final documentation/test amendment remains inside the same second commit and is subjected to this workflow again before the final deployment digest is selected.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Mandatory offline production backup was verified before migration</summary>
+      <p>The server was stopped and its complete RocksDB volume streamed to <code>/Users/tom130/_BACKUPS/tuwunel/20260804T212220Z/database.tar.zst</code> before any 1.8.2 process opened it. The archive is 2,498,829,689 bytes, expands to a 2,633,779,200-byte tar stream with 7,119 entries, and has SHA-256 <code>8da311c8c0b92166f17f38856cd06d573ebd9b7ba68db464f1afcbbf58ac1a3e</code>. Both <code>zstd -t</code> and <code>shasum -a 256 -c</code> passed repeatedly; evidence and the checksum are stored beside it. An earlier interrupted stream is retained as <code>database.failed-stream.tar.zst</code> for diagnosis and is not the restore artifact. Temporary Kubernetes backup resources were removed after verification.</p>
+      <p>The optional <code>rocksdb_never_drop_columns</code> switch was deliberately left disabled: the independently verified, offline full-volume archive is the authoritative rollback path, and production therefore exercised upstream's normal migration path rather than an extra mode that had not passed the same validation.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Production migrated to 1.8.2 and passed external validation</summary>
+      <p>Flux applied the migrated configuration and immutable image, and Kubernetes completed the rollout with one ready/available Tuwunel replica and zero container restarts. Startup created the persistent OIDC signing key, migrated the schema-17 database, and scheduled the two still-present obsolete column families for deletion; log review found no unknown/deprecated configuration warning or fatal startup error. A first one-shot admin invocation incorrectly supplied <code>--execute</code> as tini arguments and failed before the database opened; the corrected pod used the immutable Tuwunel binary as its explicit command, completed the intended operation, and was restored to its normal command before a clean rollout.</p>
+      <p>Live checks returned OIDC issuer <code>https://matrix.datadialect.cz/</code>, federation version <code>1.8.2</code>, client well-known authentication and LiveKit focus data, all expected Matrix capability flags, and HTTP 200 from both stable and unstable RTC transport routes. A secret-free production validation harness then completed open dynamic registration, authorization-code login with S256 PKCE, access/refresh/ID token issuance, <code>/whoami</code>, classic password login, RFC 8628 device authorization with the ten-character QR user code, UIAA registration for a second user, plaintext-room messaging, device/key upload, and an incremental sync containing the second user's device-list change. This is the Element X-compatible protocol sequence explicitly permitted by Phase 5; no mobile GUI was available on the executor.</p>
+      <p>The Matrix OpenID token was accepted by <code>lk-jwt</code>, and the returned LiveKit WebSocket URL completed a raw TLS upgrade with HTTP 101 and delivered a 1,439-byte binary protocol frame, proving an actual RTC room join rather than discovery alone. The Discord bot joined the validation room and answered <code>!discord help</code>. Both temporary native users, their rooms, all three temporary appservice ghosts, and the transient validation Secret were cleaned up; the existing <code>@tom130:datadialect.cz</code> administrator was preserved.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Live bridge validation exposed and corrected its MSC4190 registration</summary>
+      <p>The first live appservice-token device request returned HTTP 404 even though the server implementation had passed scratch tests. Inspection showed that both the stored registration and mautrix-discord configuration omitted the independent MSC4190 enablement flags. GitOps now sets <code>bridge.encryption.msc4190: true</code> and registration property <code>io.element.msc4190: true</code> while keeping the separate <code>device_management</code> setting false; commit <code>60112cd</code> is pushed and reconciled, the stored registration was updated, and an explicit bridge rollout consumed the rendered ConfigMap.</p>
+      <p>The replacement bridge pod is ready with zero restarts and logs successful encryption initialization, reuse of its existing bot device, creation of its MSC4190 bot device, login, and sync. With the real appservice token, device creation returned 201, stable and unstable device assertions returned 200, an unknown assertion returned <code>M_INVALID_PARAM</code>, and deletion returned 200. A real Discord bridge message round-trip then passed with no bridge ERROR/FATAL log entries.</p>
+    </details>
+    <details>
+      <summary>2026-08-04 — Final local gates and dedicated code review are clean</summary>
+      <p>A fresh full workspace test intermittently exposed an upstream test-harness race: <code>state_hash_allocation_persists_an_atomic_pair</code> asserted that the global pending-count set was empty while unrelated fresh-database admin-room allocations were still retiring. The production allocation logic did not leak. Before the correction, 4 of 20 valid fresh-process repetitions failed; the test now waits, with a bounded timeout, only for the exact successful and failed allocation IDs it created. It passed 50 of 50 fresh-process repetitions afterward.</p>
+      <p>Rust 1.95.0 then passed a fresh workspace build, every workspace unit/integration/doc test (API 147, core 101, database 62 with two ignored, service 329 with two ignored, and state-res 6), and <code>cargo clippy --workspace --all-targets</code>; nightly <code>cargo fmt --all -- --check</code> and <code>git diff --check</code> are clean. The exact <code>nix build .#oci-image --print-build-logs</code> path rebuilt release and check profiles, repeated the full serialized suite with zero failures, and produced <code>/nix/store/dhq92g2x38d5nh0lxvzk89qsh0j6pslq-tuwunel.tar.gz</code> for Linux/arm64.</p>
+      <p>A dedicated review of the entire two-commit diff against <code>upstream/main</code> found no unresolved critical or important issue: restored workflow behavior, the conditional tini fix, Darwin-only linker/fixup handling, Mach-O lifecycle sections, OIDC discovery compatibility, RTC alias routing, deployment guidance, and the exact-allocation test synchronization all match their exercised platforms and tests. A secret scan found no credential material in the workflow, plan, or deployment documentation.</p>
     </details>
   </section>
 
