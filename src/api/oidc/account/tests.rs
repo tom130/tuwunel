@@ -1,4 +1,29 @@
-use super::{ACCOUNT_MANAGEMENT_ACTIONS_SUPPORTED, normalize_account_action};
+use http::{StatusCode, header::CONTENT_SECURITY_POLICY};
+use tuwunel_core::utils::html::TUWUNEL_CSP_VALUE;
+
+use super::{
+	ACCOUNT_MANAGEMENT_ACTIONS_SUPPORTED, account_html_response_with_form_action,
+	normalize_account_action,
+};
+
+#[test]
+fn authorization_csp_only_widens_form_action() {
+	let strict = account_html_response_with_form_action(StatusCode::OK, String::new(), None);
+	let widened = account_html_response_with_form_action(
+		StatusCode::OK,
+		String::new(),
+		Some("https://element.example"),
+	);
+
+	assert_eq!(
+		strict.headers()[CONTENT_SECURITY_POLICY],
+		TUWUNEL_CSP_VALUE
+	);
+	assert_eq!(
+		widened.headers()[CONTENT_SECURITY_POLICY],
+		"default-src 'none';script-src 'self';style-src 'self';frame-ancestors 'none';form-action 'self' https://element.example;base-uri 'none'"
+	);
+}
 
 #[test]
 fn stable_names_map_to_aliases() {

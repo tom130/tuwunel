@@ -102,7 +102,7 @@ pub fn store_auth_request(&self, req_id: &str, request: &AuthRequest) {
 }
 
 #[implement(super::Server)]
-pub async fn take_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
+pub async fn peek_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
 	let request: AuthRequest = self
 		.db
 		.oidcreqid_authrequest
@@ -112,11 +112,18 @@ pub async fn take_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
 		.map(|cbor: Cbor<AuthRequest>| cbor.0)
 		.map_err(|_| err!(Request(NotFound("Unknown or expired authorization request"))))?;
 
-	self.db.oidcreqid_authrequest.remove(req_id);
-
 	if SystemTime::now() > request.expires_at {
 		return Err!(Request(NotFound("Authorization request has expired")));
 	}
+
+	Ok(request)
+}
+
+#[implement(super::Server)]
+pub async fn take_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
+	let request = self.peek_auth_request(req_id).await?;
+
+	self.db.oidcreqid_authrequest.remove(req_id);
 
 	Ok(request)
 }

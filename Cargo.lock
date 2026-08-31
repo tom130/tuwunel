@@ -5384,12 +5384,15 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 name = "tuwunel"
 version = "1.8.2"
 dependencies = [
+ "axum",
  "clap",
  "console-subscriber",
  "const-str",
  "criterion",
  "ctor",
  "dtor",
+ "http",
+ "http-body-util",
  "insta",
  "log",
  "maplit",
@@ -5404,6 +5407,7 @@ dependencies = [
  "similar 3.1.1",
  "tokio",
  "tokio-metrics",
+ "tower",
  "tracing",
  "tracing-flame",
  "tracing-journald",

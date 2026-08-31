@@ -37,7 +37,9 @@ use tower_http::{
 };
 use tracing::Level;
 use tuwunel_api::router::{ConfiguredIpSource, TrustedPeerSubnets, state::Guard};
-use tuwunel_core::{Result, Server, config::IpSource, debug, error};
+use tuwunel_core::{
+	Result, Server, config::IpSource, debug, error, utils::html::TUWUNEL_CSP_VALUE,
+};
 use tuwunel_service::Services;
 
 use crate::{request, router};
@@ -58,15 +60,6 @@ pub(crate) struct Handle<S, F> {
 	handler: F,
 	inner: S,
 }
-
-const TUWUNEL_CSP: &[&str] = &[
-	"default-src 'none'",
-	"script-src 'self'",
-	"style-src 'self'",
-	"frame-ancestors 'none'",
-	"form-action 'self'",
-	"base-uri 'none'",
-];
 
 pub(crate) fn build(services: &Arc<Services>) -> Result<(Router, Guard)> {
 	let server = &services.server;
@@ -265,9 +258,12 @@ fn html_layer<T>() -> MapResponseLayer<impl Fn(http::Response<T>) -> http::Respo
 			.and_then(Result::ok)
 			.is_some_and(|val| val.contains("text/html"))
 		{
+			// `form-action` is enforced across redirects by Chromium. OIDC
+			// authorization pages deliberately override this strict default with
+			// their validated client redirect origin.
 			headers
 				.entry(header::CONTENT_SECURITY_POLICY)
-				.or_insert(HeaderValue::from_static(const_str::join!(TUWUNEL_CSP, ";")));
+				.or_insert(HeaderValue::from_static(TUWUNEL_CSP_VALUE));
 
 			headers
 				.entry(header::X_FRAME_OPTIONS)

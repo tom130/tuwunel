@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-08-31T20:15:00Z</dd>
-        <dt>modified</dt>     <dd>2026-08-31T20:36:16Z</dd>
-        <dt>commits</dt>      <dd>—</dd>
+        <dt>modified</dt>     <dd>2026-08-31T21:26:06Z</dd>
+        <dt>commits</dt>      <dd><code>1f27e308</code></dd>
         <dt>agent name</dt>   <dd>claude-opus-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>ce4a14e7-419f-4562-86b6-28371d1dfb71</dd>
         <dt>back refs</dt>    <dd>plans/archive/oauth-authorization-code-PLAN.md, plans/archive/msc4108-qr-login-PLAN.md, plans/deploy-config-1.8.2.md</dd>
@@ -363,38 +363,38 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 1: Scope <code>form-action</code> to the pending client</h3>
+      <h3><code class="status">[x]</code> Phase 1: Scope <code>form-action</code> to the pending client</h3>
       <p>The blocker fix. The authorization-flow pages emit a CSP that permits the one cross-origin destination the flow is designed to reach, derived from the <code>redirect_uri</code> that <code>authorize_route</code> already validated against the registered client. The global policy, and every other HTML response, are untouched.</p>
 
       <h4>1. Add a non-destructive read of the authorization request</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>src/service/oauth/server/auth.rs</code>, add <code>peek_auth_request(&amp;self, req_id: &amp;str) -&gt; Result&lt;AuthRequest&gt;</code>: identical to <code>take_auth_request</code> including the expiry check, but without the <code>remove</code>.</li>
-        <li><code class="status">[]</code> Refactor <code>take_auth_request</code> to call <code>peek_auth_request</code> and then <code>remove</code>, so the two cannot drift apart.</li>
-        <li><code class="status">[]</code> Keep both error messages exactly as they are — they are asserted by tests and read by operators.</li>
+        <li><code class="status">[x]</code> In <code>src/service/oauth/server/auth.rs</code>, add <code>peek_auth_request(&amp;self, req_id: &amp;str) -&gt; Result&lt;AuthRequest&gt;</code>: identical to <code>take_auth_request</code> including the expiry check, but without the <code>remove</code>.</li>
+        <li><code class="status">[x]</code> Refactor <code>take_auth_request</code> to call <code>peek_auth_request</code> and then <code>remove</code>, so the two cannot drift apart.</li>
+        <li><code class="status">[x]</code> Keep both error messages exactly as they are — they are asserted by tests and read by operators.</li>
       </ul>
 
       <h4>2. Derive a CSP source expression from a redirect URI</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Add a private helper in <code>src/api/oidc/native.rs</code>: <code>fn form_action_source(redirect_uri: &amp;str) -&gt; Option&lt;String&gt;</code>.</li>
-        <li><code class="status">[]</code> For <code>http</code>/<code>https</code>, return the serialized origin (<code>scheme://host[:port]</code>) via <code>Url::origin().ascii_serialization()</code> — never the path or query, so <code>…/?no_universal_links=true</code> contributes nothing.</li>
-        <li><code class="status">[]</code> For any other scheme (RFC 8252 private-use schemes such as <code>io.element.android</code>), return <code>Some(format!("{scheme}:"))</code>, a valid CSP scheme-source. These clients already take the interstitial path, so this is belt-and-braces.</li>
-        <li><code class="status">[]</code> Return <code>None</code> when the URI fails to parse or the serialized origin is opaque (<code>"null"</code>), and reject any candidate containing whitespace, <code>;</code> or <code>,</code> so a source expression can never break out of the header.</li>
+        <li><code class="status">[x]</code> Add a private helper in <code>src/api/oidc/native.rs</code>: <code>fn form_action_source(redirect_uri: &amp;str) -&gt; Option&lt;String&gt;</code>.</li>
+        <li><code class="status">[x]</code> For <code>http</code>/<code>https</code>, return the serialized origin (<code>scheme://host[:port]</code>) via <code>Url::origin().ascii_serialization()</code> — never the path or query, so <code>…/?no_universal_links=true</code> contributes nothing.</li>
+        <li><code class="status">[x]</code> For any other scheme (RFC 8252 private-use schemes such as <code>io.element.android</code>), return <code>Some(format!("{scheme}:"))</code>, a valid CSP scheme-source. These clients already take the interstitial path, so this is belt-and-braces.</li>
+        <li><code class="status">[x]</code> Return <code>None</code> when the URI fails to parse or the serialized origin is opaque (<code>"null"</code>), and reject any candidate containing whitespace, <code>;</code> or <code>,</code> so a source expression can never break out of the header.</li>
       </ul>
 
       <h4>3. Emit the per-page policy</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>src/api/oidc/account.rs</code>, add <code>account_html_response_with_form_action(status, html, extra_source: Option&lt;&amp;str&gt;) -&gt; Response</code> that sets <code>CONTENT_SECURITY_POLICY</code> explicitly, reusing the same directive list as <code>TUWUNEL_CSP</code> with <code>form-action 'self' &lt;extra_source&gt;</code>.</li>
-        <li><code class="status">[]</code> Export the directive list from <code>tuwunel_router</code> (or mirror it in one <code>const</code> in <code>account.rs</code>) so the two policies cannot silently diverge; add a unit test asserting the non-<code>form-action</code> directives are byte-identical to <code>TUWUNEL_CSP</code>.</li>
-        <li><code class="status">[]</code> In <code>native_get_route</code> and the error re-render path of <code>native_submit_route</code>, for <code>Flow::Authorization(req_id)</code> only, peek the request and pass its <code>form_action_source</code> through.</li>
-        <li><code class="status">[]</code> Leave <code>Flow::Device</code> and <code>Flow::Account</code> on the strict global policy — both complete same-origin and gain nothing from a wider <code>form-action</code>.</li>
+        <li><code class="status">[x]</code> In <code>src/api/oidc/account.rs</code>, add <code>account_html_response_with_form_action(status, html, extra_source: Option&lt;&amp;str&gt;) -&gt; Response</code> that sets <code>CONTENT_SECURITY_POLICY</code> explicitly, reusing the same directive list as <code>TUWUNEL_CSP</code> with <code>form-action 'self' &lt;extra_source&gt;</code>.</li>
+        <li><code class="status">[x]</code> Export the directive list from <code>tuwunel_router</code> (or mirror it in one <code>const</code> in <code>account.rs</code>) so the two policies cannot silently diverge; add a unit test asserting the non-<code>form-action</code> directives are byte-identical to <code>TUWUNEL_CSP</code>.</li>
+        <li><code class="status">[x]</code> In <code>native_get_route</code> and the error re-render path of <code>native_submit_route</code>, for <code>Flow::Authorization(req_id)</code> only, peek the request and pass its <code>form_action_source</code> through.</li>
+        <li><code class="status">[x]</code> Leave <code>Flow::Device</code> and <code>Flow::Account</code> on the strict global policy — both complete same-origin and gain nothing from a wider <code>form-action</code>.</li>
       </ul>
 
       <h4>4. Testing Strategy</h4>
       <p>Unit tests over the pure helpers (a URL in, a source expression out) plus assertions on the assembled header. The end-to-end proof is deferred to Phase 5, where a real browser is available.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — <code>form_action_source</code> covers: https with path+query → origin only; https with a non-default port → port retained; <code>io.element.android:/cb</code> → <code>io.element.android:</code>; <code>javascript:alert(1)</code> and <code>data:text/html,x</code> → rejected; malformed input → <code>None</code>; an injected <code>"https://a; script-src *"</code> → <code>None</code>.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api csp</code> — the assembled header for an authorization flow contains <code>form-action 'self' https://element.datadialect.cz</code> and still contains <code>default-src 'none'</code> and <code>base-uri 'none'</code>; the device and account flows contain <code>form-action 'self'</code> with nothing appended.</li>
-        <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — no new lints.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api oidc</code> — <code>form_action_source</code> covers: https with path+query → origin only; https with a non-default port → port retained; <code>io.element.android:/cb</code> → <code>io.element.android:</code>; <code>javascript:alert(1)</code> and <code>data:text/html,x</code> → rejected; malformed input → <code>None</code>; an injected <code>"https://a; script-src *"</code> → <code>None</code>.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api csp</code> — the assembled header for an authorization flow contains <code>form-action 'self' https://element.datadialect.cz</code> and still contains <code>default-src 'none'</code> and <code>base-uri 'none'</code>; the device and account flows contain <code>form-action 'self'</code> with nothing appended.</li>
+        <li><code class="status">[x]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — no new lints.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -654,6 +654,10 @@ GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   404  Unknown or expir
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-08-31 — Share the CSP directives through <code>tuwunel_core</code></summary>
+      <p><code>tuwunel_router</code> depends on <code>tuwunel_api</code>, so exporting <code>TUWUNEL_CSP</code> from the router for use by the API would introduce a dependency cycle. Phase 1 will move the shared directive list to <code>tuwunel_core</code>, which both crates already depend on, and keep the strict and per-request policies generated from that single definition.</p>
+    </details>
     <details open>
       <summary>2026-08-31 — Phase 0 used a credential-free deterministic browser harness</summary>
       <p>The execution environment had Chrome and Firefox but no production Matrix account credentials, and the connected Playwright browser's packaged Chrome path required unavailable sudo access. Phase 0 therefore replayed the exact production CSP and redirect topology on two local origins using the installed Chrome plus Selenium-driven Firefox. This preserves the gate's purpose — eyewitnessing the browser-only event and distinguishing a Chromium CSP block from a callback failure — without handling user credentials. The live CSP header and historical ingress sequence were re-verified separately against <code>matrix.datadialect.cz</code>.</p>

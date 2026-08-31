@@ -4,6 +4,17 @@
 //! references. Existing entity references are escaped again because ampersands
 //! are processed first.
 
+pub const TUWUNEL_CSP: &[&str] = &[
+	"default-src 'none'",
+	"script-src 'self'",
+	"style-src 'self'",
+	"frame-ancestors 'none'",
+	"form-action 'self'",
+	"base-uri 'none'",
+];
+
+pub const TUWUNEL_CSP_VALUE: &str = const_str::join!(TUWUNEL_CSP, ";");
+
 /// Escapes HTML-sensitive ASCII characters in a string.
 ///
 /// Ampersands, angle brackets, both quote characters, and backticks are

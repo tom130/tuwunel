@@ -248,11 +248,15 @@ features = ["schedule-latency"]
 workspace = true
 
 [dev-dependencies]
+axum.workspace = true
 criterion.workspace = true
+http.workspace = true
+http-body-util.workspace = true
 insta.workspace = true
 maplit.workspace = true
 serde_json.workspace = true
 similar.workspace = true
+tower.workspace = true
 
 [lints]
 workspace = true

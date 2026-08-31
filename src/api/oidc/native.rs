@@ -19,7 +19,8 @@ use url::Url;
 
 use super::{
 	account::{
-		ACCOUNT_HEAD, account_error_response, account_html_response, account_redirect_response,
+		ACCOUNT_HEAD, account_error_response, account_html_response_with_form_action,
+		account_redirect_response,
 	},
 	url_encode,
 };
@@ -69,6 +70,48 @@ enum Flow<'a> {
 	Device(&'a str),
 }
 
+fn form_action_source(redirect_uri: &str) -> Option<String> {
+	let url = Url::parse(redirect_uri).ok()?;
+	let source = match url.scheme() {
+		| "http" | "https" => url.origin().ascii_serialization(),
+		| "javascript" | "data" => return None,
+		| scheme => format!("{scheme}:"),
+	};
+
+	(source != "null" && !source.contains([' ', '\t', '\r', '\n', ';', ','])).then_some(source)
+}
+
+async fn authorization_form_action_source(
+	services: &Services,
+	flow: Flow<'_>,
+) -> Result<Option<String>> {
+	let Flow::Authorization(req_id) = flow else {
+		return Ok(None);
+	};
+
+	let request = services
+		.oauth
+		.get_server()?
+		.peek_auth_request(req_id)
+		.await?;
+
+	Ok(form_action_source(&request.redirect_uri))
+}
+
+fn native_html_response(
+	status: StatusCode,
+	html: String,
+	flow: Flow<'_>,
+	form_action: Option<&str>,
+) -> Response {
+	match flow {
+		| Flow::Authorization(_) =>
+			account_html_response_with_form_action(status, html, form_action),
+		| Flow::Account { .. } | Flow::Device(_) =>
+			account_html_response_with_form_action(status, html, None),
+	}
+}
+
 /// Renders the native login or registration page bound to a pending
 /// authorization request.
 pub(crate) async fn native_get_route(
@@ -96,8 +139,13 @@ pub(crate) async fn native_get_route(
 	};
 
 	let view = params.view.as_deref().unwrap_or("login");
+	let form_action = match authorization_form_action_source(&services, context).await {
+		| Ok(source) => source,
+		| Err(e) => return account_error_response(&e),
+	};
+	let html = render_page(&services, view, context, None).await;
 
-	account_html_response(StatusCode::OK, render_page(&services, view, context, None).await)
+	native_html_response(StatusCode::OK, html, context, form_action.as_deref())
 }
 
 fn parse_flow<'a>(
@@ -147,11 +195,15 @@ pub(crate) async fn native_submit_route(
 				| (Flow::Authorization(_), Some("register")) => "register",
 				| _ => "login",
 			};
+			let form_action = match authorization_form_action_source(&services, context).await {
+				| Ok(source) => source,
+				| Err(context_error) => return account_error_response(&context_error),
+			};
 
 			let msg = e.sanitized_message();
 			let html = render_page(&services, view, context, Some(&msg)).await;
 
-			account_html_response(e.status_code(), html)
+			native_html_response(e.status_code(), html, context, form_action.as_deref())
 		},
 	}
 }
@@ -580,7 +632,53 @@ static TOKEN_FIELD: &str = r#"<label>
 
 #[cfg(test)]
 mod tests {
-	use super::{Flow, error_block, parse_flow, render_login};
+	use http::{StatusCode, header::CONTENT_SECURITY_POLICY};
+	use tuwunel_core::utils::html::TUWUNEL_CSP_VALUE;
+
+	use super::{
+		Flow, error_block, form_action_source, native_html_response, parse_flow, render_login,
+	};
+
+	#[test]
+	fn non_authorization_flows_keep_strict_csp() {
+		for flow in [
+			Flow::Device("BCDF-GHJK"),
+			Flow::Account {
+				action: "org.matrix.sessions_list",
+				device_id: "",
+			},
+		] {
+			let response = native_html_response(StatusCode::OK, String::new(), flow, None);
+			assert_eq!(
+				response.headers()[CONTENT_SECURITY_POLICY],
+				TUWUNEL_CSP_VALUE
+			);
+		}
+	}
+
+	#[test]
+	fn form_action_uses_https_origin_only() {
+		assert_eq!(
+			form_action_source("https://element.example/callback?query=value").as_deref(),
+			Some("https://element.example")
+		);
+	}
+
+	#[test]
+	fn form_action_accepts_safe_origins_and_rejects_header_injection() {
+		assert_eq!(
+			form_action_source("https://element.example:8448/callback").as_deref(),
+			Some("https://element.example:8448")
+		);
+		assert_eq!(
+			form_action_source("io.element.android:/cb").as_deref(),
+			Some("io.element.android:")
+		);
+		assert_eq!(form_action_source("javascript:alert(1)"), None);
+		assert_eq!(form_action_source("data:text/html,x"), None);
+		assert_eq!(form_action_source("not a URI"), None);
+		assert_eq!(form_action_source("https://a; script-src *"), None);
+	}
 
 	#[test]
 	fn login_page_has_form_and_hidden_req_id() {

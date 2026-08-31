@@ -16,12 +16,15 @@ use axum::{
 };
 use http::{
 	HeaderValue, Method, StatusCode,
-	header::{CACHE_CONTROL, CONTENT_TYPE, REFERRER_POLICY},
+	header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, CONTENT_TYPE, REFERRER_POLICY},
 };
 use ruma::OwnedDeviceId;
 use tuwunel_core::{
 	Err, Error, Result, err,
-	utils::{BoolExt, html::escape as html_escape},
+	utils::{
+		BoolExt,
+		html::{TUWUNEL_CSP_VALUE, escape as html_escape},
+	},
 };
 use tuwunel_service::Services;
 use url::Url;
@@ -374,6 +377,37 @@ pub(super) fn account_html_response(status: StatusCode, html: String) -> Respons
 	let headers = [(CACHE_CONTROL, ACCOUNT_CACHE_CONTROL), (REFERRER_POLICY, "no-referrer")];
 
 	(status, headers, Html(html)).into_response()
+}
+
+pub(super) fn account_html_response_with_form_action(
+	status: StatusCode,
+	html: String,
+	extra_source: Option<&str>,
+) -> Response {
+	let mut response = account_html_response(status, html);
+	let extra_source = extra_source.filter(|source| {
+		!source.is_empty()
+			&& !source
+				.chars()
+				.any(|c| c.is_ascii_whitespace() || matches!(c, ';' | ','))
+	});
+	let policy = extra_source.map_or_else(
+		|| TUWUNEL_CSP_VALUE.to_owned(),
+		|source| {
+			TUWUNEL_CSP_VALUE.replace(
+				"form-action 'self'",
+				&format!("form-action 'self' {source}"),
+			)
+		},
+	);
+	let policy = HeaderValue::try_from(policy)
+		.unwrap_or_else(|_| HeaderValue::from_static(TUWUNEL_CSP_VALUE));
+
+	response
+		.headers_mut()
+		.insert(CONTENT_SECURITY_POLICY, policy);
+
+	response
 }
 
 pub(super) fn account_error_response(error: &Error) -> Response {
