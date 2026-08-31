@@ -8,11 +8,19 @@ use std::{
 };
 
 use axum::{Router, body::Body, response::Response};
-use http::{Request, StatusCode, header::CONTENT_SECURITY_POLICY};
+use http::{
+	Request, StatusCode,
+	header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE},
+};
+use http_body_util::BodyExt;
 use tower::ServiceExt;
 use tuwunel::{Args, Runtime, Server};
 use tuwunel_core::{Err, Error, Result, ruma::UserId};
-use tuwunel_service::{Services, oauth::server::AuthRequest, users::Register};
+use tuwunel_service::{
+	Services,
+	oauth::server::{AuthRequest, DcrRequest},
+	users::Register,
+};
 
 /// The OIDC server (next-gen auth) constructs in native mode with no
 /// third-party `identity_provider`, and the login-token tail the native handler
@@ -63,8 +71,39 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 		return Err!("unexpected issuer: {issuer}");
 	}
 
+	let auth_request = test_auth_request();
+	assert_auth_request_storage(services, &auth_request).await?;
+	assert_native_pages(services, &auth_request).await?;
+
+	let user_id = UserId::parse_with_server_name("nativealice", services.globals.server_name())?;
+	services
+		.users
+		.full_register(Register {
+			user_id: Some(&user_id),
+			password: Some("a-strong-test-password"),
+			..Default::default()
+		})
+		.await?;
+
+	assert_completion_error_pages(services, &auth_request, &user_id).await?;
+	assert_authorize_error_pages(services).await?;
+
+	// The native submit handler authenticates, mints a login token, and lets
+	// _complete consume it; exercise that token tail directly.
+	let token = "native-auth-test-login-token";
+	let _expires_in = services.users.create_login_token(&user_id, token);
+	let resolved = services.users.find_from_login_token(token).await?;
+
+	if resolved != user_id {
+		return Err!("login token resolved to the wrong user: {resolved}");
+	}
+
+	Ok(())
+}
+
+fn test_auth_request() -> AuthRequest {
 	let now = SystemTime::now();
-	let auth_request = AuthRequest {
+	AuthRequest {
 		client_id: "native-test-client".to_owned(),
 		redirect_uri: "https://element.example/callback".to_owned(),
 		scope: "openid".to_owned(),
@@ -76,8 +115,15 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 		response_mode: None,
 		created_at: now,
 		expires_at: now.checked_add(Duration::from_mins(1)).unwrap_or(now),
-	};
-	oidc.store_auth_request("native-peek-test", &auth_request);
+	}
+}
+
+async fn assert_auth_request_storage(
+	services: &Arc<Services>,
+	auth_request: &AuthRequest,
+) -> Result {
+	let oidc = services.oauth.get_server()?;
+	oidc.store_auth_request("native-peek-test", auth_request);
 	assert_eq!(
 		oidc
 			.peek_auth_request("native-peek-test")
@@ -99,6 +145,7 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 		return Err!("unexpected missing-request message: {missing_message}");
 	}
 
+	let now = SystemTime::now();
 	let mut expired_request = auth_request.clone();
 	expired_request.expires_at = now
 		.checked_sub(Duration::from_secs(1))
@@ -116,7 +163,12 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 		return Err!("unexpected expired-request message: {expired_message}");
 	}
 
-	oidc.store_auth_request("native-csp-test", &auth_request);
+	Ok(())
+}
+
+async fn assert_native_pages(services: &Arc<Services>, auth_request: &AuthRequest) -> Result {
+	let oidc = services.oauth.get_server()?;
+	oidc.store_auth_request("native-csp-test", auth_request);
 	let request = Request::get("/_tuwunel/oidc/native?oidc_req_id=native-csp-test&view=login")
 		.body(Body::empty())
 		.expect("the static native test URI must be valid");
@@ -134,19 +186,28 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 		return Err!("unexpected native authorization CSP: {csp}");
 	}
 
-	let user_id = UserId::parse_with_server_name("nativealice", services.globals.server_name())?;
-	services
-		.users
-		.full_register(Register {
-			user_id: Some(&user_id),
-			password: Some("a-strong-test-password"),
-			..Default::default()
-		})
-		.await?;
+	let request = Request::get("/_tuwunel/oidc/native?oidc_req_id=unknown-native-request&view=login")
+		.body(Body::empty())
+		.expect("the static unknown-native URI must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::NOT_FOUND);
+	assert_html_response(&response);
+	let body = response_text(response).await;
+	assert!(body.contains("sign-in link has expired"));
+	assert!(!body.contains("<form"));
 
+	Ok(())
+}
+
+async fn assert_completion_error_pages(
+	services: &Arc<Services>,
+	auth_request: &AuthRequest,
+	user_id: &UserId,
+) -> Result {
+	let oidc = services.oauth.get_server()?;
 	let retry_token = "native-completion-retry-token";
-	let _expires_in = services.users.create_login_token(&user_id, retry_token);
-	oidc.store_auth_request("native-completion-retry", &auth_request);
+	let _expires_in = services.users.create_login_token(user_id, retry_token);
+	oidc.store_auth_request("native-completion-retry", auth_request);
 	let request = Request::get(
 		"/_tuwunel/oidc/_complete?oidc_req_id=native-completion-retry&loginToken=invalid",
 	)
@@ -154,6 +215,11 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 	.expect("the static bad-token completion URI must be valid");
 	let response = api_request(services, request).await;
 	assert_eq!(response.status(), StatusCode::FORBIDDEN);
+	assert_html_response(&response);
+	let body = response_text(response).await;
+	assert!(body.contains("Invalid or expired login token"));
+	assert!(body.contains(r#"href="https://element.example""#));
+	assert!(!body.contains("errcode"));
 
 	let request = Request::get(format!(
 		"/_tuwunel/oidc/_complete?oidc_req_id=native-completion-retry&loginToken={retry_token}"
@@ -166,7 +232,7 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 	let preserved_token = "native-completion-preserved-token";
 	let _expires_in = services
 		.users
-		.create_login_token(&user_id, preserved_token);
+		.create_login_token(user_id, preserved_token);
 	let request = Request::get(format!(
 		"/_tuwunel/oidc/_complete?oidc_req_id=unknown-request&loginToken={preserved_token}"
 	))
@@ -174,8 +240,13 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 	.expect("the unknown-request completion URI must be valid");
 	let response = api_request(services, request).await;
 	assert_eq!(response.status(), StatusCode::NOT_FOUND);
+	assert_html_response(&response);
+	let body = response_text(response).await;
+	assert!(body.contains("Unknown or expired authorization request"));
+	assert!(body.contains(r#"href="/_tuwunel/oidc/account""#));
+	assert!(!body.contains("errcode"));
 
-	oidc.store_auth_request("native-completion-after-unknown", &auth_request);
+	oidc.store_auth_request("native-completion-after-unknown", auth_request);
 	let request = Request::get(format!(
 		"/_tuwunel/oidc/_complete?oidc_req_id=native-completion-after-unknown&loginToken={preserved_token}"
 	))
@@ -184,18 +255,57 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 	let response = api_request(services, request).await;
 	assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
 
-	// The native submit handler authenticates, mints a login token, and lets
-	// _complete consume it; exercise that token tail directly.
-	let token = "native-auth-test-login-token";
-	let _expires_in = services.users.create_login_token(&user_id, token);
-	let resolved = services
-		.users
-		.find_from_login_token(token)
-		.await?;
+	Ok(())
+}
 
-	if resolved != user_id {
-		return Err!("login token resolved to the wrong user: {resolved}");
-	}
+async fn assert_authorize_error_pages(services: &Arc<Services>) -> Result {
+	let oidc = services.oauth.get_server()?;
+	let client = oidc
+		.register_client(DcrRequest {
+			redirect_uris: vec!["https://element.example/callback?query=value".to_owned()],
+			client_name: None,
+			client_uri: None,
+			logo_uri: None,
+			contacts: Vec::new(),
+			token_endpoint_auth_method: None,
+			grant_types: None,
+			response_types: None,
+			application_type: None,
+			policy_uri: None,
+			tos_uri: None,
+			software_id: None,
+			software_version: None,
+		})
+		.await?;
+	let request = Request::get(format!(
+		"/_tuwunel/oidc/authorize?client_id={}&redirect_uri=https%3A%2F%2Felement.example%2Fcallback%3Fquery%3Dvalue&response_type=code&scope=openid&code_challenge=test-challenge&code_challenge_method=S256&idp_id=missing-provider",
+		client.client_id
+	))
+	.header("x-forwarded-for", "127.0.0.1")
+	.body(Body::empty())
+	.expect("the registered-client authorize URI must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+	assert_html_response(&response);
+	let body = response_text(response).await;
+	assert!(body.contains("Unrecognized identity provider"));
+	assert!(body.contains(r#"href="https://element.example""#));
+	assert!(!body.contains("errcode"));
+
+	let request = Request::get(
+		"/_tuwunel/oidc/authorize?client_id=unknown-client&redirect_uri=https%3A%2F%2Fevil.example%2Fcallback&response_type=code&scope=openid&code_challenge=test-challenge&code_challenge_method=S256",
+	)
+	.header("x-forwarded-for", "127.0.0.1")
+	.body(Body::empty())
+	.expect("the unknown-client authorize URI must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::NOT_FOUND);
+	assert_html_response(&response);
+	let body = response_text(response).await;
+	assert!(body.contains("Unknown client_id"));
+	assert!(body.contains(r#"href="/_tuwunel/oidc/account""#));
+	assert!(!body.contains("evil.example"));
+	assert!(!body.contains("errcode"));
 
 	Ok(())
 }
@@ -215,4 +325,25 @@ async fn api_request(services: &Arc<Services>, request: Request<Body>) -> Respon
 	drop(state_guard);
 
 	response
+}
+
+fn assert_html_response(response: &Response) {
+	let content_type = response
+		.headers()
+		.get(CONTENT_TYPE)
+		.and_then(|value| value.to_str().ok())
+		.unwrap_or_default();
+
+	assert!(content_type.starts_with("text/html"));
+}
+
+async fn response_text(response: Response) -> String {
+	let body = response
+		.into_body()
+		.collect()
+		.await
+		.expect("test response body must be readable")
+		.to_bytes();
+
+	String::from_utf8(body.to_vec()).expect("test response body must be UTF-8")
 }

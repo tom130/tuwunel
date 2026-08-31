@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-08-31T20:15:00Z</dd>
-        <dt>modified</dt>     <dd>2026-08-31T21:38:46Z</dd>
-        <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code></dd>
+        <dt>modified</dt>     <dd>2026-08-31T21:52:44Z</dd>
+        <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code>, <code>99b7a40b</code></dd>
         <dt>agent name</dt>   <dd>claude-opus-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>ce4a14e7-419f-4562-86b6-28371d1dfb71</dd>
         <dt>back refs</dt>    <dd>plans/archive/oauth-authorization-code-PLAN.md, plans/archive/msc4108-qr-login-PLAN.md, plans/deploy-config-1.8.2.md</dd>
@@ -427,29 +427,29 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 3: Stop showing JSON to humans; fail fast on dead requests</h3>
+      <h3><code class="status">[x]</code> Phase 3: Stop showing JSON to humans; fail fast on dead requests</h3>
       <p>What the user actually pasted was a raw Matrix error object rendered as a web page. Every OIDC page except the two browser-navigation routes already renders <code>account_error_response</code>. Align them, and stop serving a working-looking form for a request that no longer exists.</p>
 
       <h4>1. HTML errors on browser-facing routes</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Change <code>complete_route</code> to return <code>Response</code>, wrapping the fallible body and mapping errors through <code>account_error_response</code> — the same shape <code>native_get_route</code> already uses at <code>src/api/oidc/native.rs:70-95</code>.</li>
-        <li><code class="status">[]</code> Do the same for <code>authorize_route</code> in <code>src/api/oidc/authorize.rs</code>, so a bad <code>redirect_uri</code> or a missing provider is legible rather than a JSON blob.</li>
-        <li><code class="status">[]</code> Add a "Start over" link to the error page for these two routes pointing at the client's own origin when it is known, and otherwise at <code>/_tuwunel/oidc/account</code>.</li>
-        <li><code class="status">[]</code> Keep <code>sanitized_message()</code> as the only text source so no internal detail leaks into the page.</li>
+        <li><code class="status">[x]</code> Change <code>complete_route</code> to return <code>Response</code>, wrapping the fallible body and mapping errors through <code>account_error_response</code> — the same shape <code>native_get_route</code> already uses at <code>src/api/oidc/native.rs:70-95</code>.</li>
+        <li><code class="status">[x]</code> Do the same for <code>authorize_route</code> in <code>src/api/oidc/authorize.rs</code>, so a bad <code>redirect_uri</code> or a missing provider is legible rather than a JSON blob.</li>
+        <li><code class="status">[x]</code> Add a "Start over" link to the error page for these two routes pointing at the client's own origin when it is known, and otherwise at <code>/_tuwunel/oidc/account</code>.</li>
+        <li><code class="status">[x]</code> Keep <code>sanitized_message()</code> as the only text source so no internal detail leaks into the page.</li>
       </ul>
 
       <h4>2. Reject dead authorization requests at page render</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>native_get_route</code>, for <code>Flow::Authorization</code>, peek the request first and render an explicit "this sign-in link has expired — return to your app and start again" page instead of a form when it is missing or expired.</li>
-        <li><code class="status">[]</code> Reuse the peek already introduced in Phase 1 so the page is not read twice.</li>
+        <li><code class="status">[x]</code> In <code>native_get_route</code>, for <code>Flow::Authorization</code>, peek the request first and render an explicit "this sign-in link has expired — return to your app and start again" page instead of a form when it is missing or expired.</li>
+        <li><code class="status">[x]</code> Reuse the peek already introduced in Phase 1 so the page is not read twice.</li>
       </ul>
 
       <h4>3. Testing Strategy</h4>
       <p>Assert on content type and body shape, which is exactly what regressed: the routes must never answer a navigation with <code>application/json</code>.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — an error from <code>complete_route</code> and from <code>authorize_route</code> yields <code>text/html</code>, contains the sanitized message, and contains no <code>errcode</code> string.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api native</code> — an unknown <code>oidc_req_id</code> renders the expired page and no <code>&lt;form</code> element.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — existing XSS/placeholder-smuggling tests in <code>native.rs</code> still pass unmodified.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api oidc</code> — an error from <code>complete_route</code> and from <code>authorize_route</code> yields <code>text/html</code>, contains the sanitized message, and contains no <code>errcode</code> string.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api native</code> — an unknown <code>oidc_req_id</code> renders the expired page and no <code>&lt;form</code> element.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api oidc</code> — existing XSS/placeholder-smuggling tests in <code>native.rs</code> still pass unmodified.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -654,6 +654,10 @@ GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   404  Unknown or expir
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-08-31 — Browser-route response assertions use the server integration fixture</summary>
+      <p>The <code>tuwunel_api</code> unit target covers the pure origin, escaping, expired-page, and existing placeholder-smuggling helpers. The route-level <code>text/html</code>, sanitized-body, safe-link, and no-<code>errcode</code> assertions require live OIDC client/request storage, so they run through the real API router in <code>src/main/tests/native_auth.rs</code>. Both planned API filters and the main integration binary pass.</p>
+    </details>
     <details open>
       <summary>2026-08-31 — Completion ordering is exercised in the server integration fixture</summary>
       <p>The retry and token-preservation assertions require real login-token and authorization-request storage, which the <code>tuwunel_api</code> unit target does not construct. The handler-level HTTP assertions therefore live in <code>src/main/tests/native_auth.rs</code> and run with <code>cargo test -p tuwunel --test native_auth</code>; the planned API and service filter commands also pass.</p>

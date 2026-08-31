@@ -2,7 +2,7 @@ use std::{net::IpAddr, time::SystemTime};
 
 use axum::{
 	extract::State,
-	response::{IntoResponse, Redirect},
+	response::{IntoResponse, Redirect, Response},
 };
 use serde::Deserialize;
 use tuwunel_core::{
@@ -15,7 +15,11 @@ use tuwunel_service::{
 };
 use url::Url;
 
-use super::{OIDC_REQ_ID_LENGTH, sso_redirect_url};
+use super::{
+	OIDC_REQ_ID_LENGTH,
+	account::{browser_error_response, redirect_origin},
+	sso_redirect_url,
+};
 use crate::ClientIp;
 
 #[derive(Debug, Deserialize)]
@@ -39,7 +43,21 @@ pub(crate) async fn authorize_route(
 	State(services): State<crate::State>,
 	ClientIp(client): ClientIp,
 	request: axum::extract::Request,
-) -> Result<impl IntoResponse> {
+) -> Response {
+	let mut start_over_origin = None;
+
+	match authorize(&services, client, request, &mut start_over_origin).await {
+		| Ok(response) => response,
+		| Err(error) => browser_error_response(&error, start_over_origin.as_deref()),
+	}
+}
+
+async fn authorize(
+	services: &Services,
+	client: IpAddr,
+	request: axum::extract::Request,
+	start_over_origin: &mut Option<String>,
+) -> Result<Response> {
 	let oidc = services.oauth.get_server()?;
 	services.oauth.check_rate_limit(client)?;
 
@@ -69,7 +87,8 @@ pub(crate) async fn authorize_route(
 		| _ => {},
 	}
 
-	validate_redirect_uri(&services, &params).await?;
+	validate_redirect_uri(services, &params).await?;
+	*start_over_origin = redirect_origin(&params.redirect_uri);
 
 	let now = SystemTime::now();
 	let req_id = utils::random_string(OIDC_REQ_ID_LENGTH);
@@ -139,7 +158,7 @@ pub(crate) async fn authorize_route(
 				url
 			})?;
 
-		return Ok(Redirect::temporary(native_url.as_str()));
+		return Ok(Redirect::temporary(native_url.as_str()).into_response());
 	};
 
 	let complete_url = Url::parse(&format!("{base}/_tuwunel/oidc/_complete"))
@@ -153,7 +172,7 @@ pub(crate) async fn authorize_route(
 
 	let sso_url = sso_redirect_url(base, &idp_id, &complete_url)?;
 
-	Ok(Redirect::temporary(sso_url.as_str()))
+	Ok(Redirect::temporary(sso_url.as_str()).into_response())
 }
 
 /// Decide whether a request with no explicitly-selected provider is served the

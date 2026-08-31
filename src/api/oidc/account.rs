@@ -417,6 +417,54 @@ pub(super) fn account_error_response(error: &Error) -> Response {
 	account_html_response(code, account_error_page(&msg))
 }
 
+pub(super) fn browser_error_response(error: &Error, start_over_origin: Option<&str>) -> Response {
+	let msg = error.sanitized_message();
+	let code = error.status_code();
+	let start_over_origin = start_over_origin.filter(|origin| {
+		redirect_origin(origin)
+			.as_deref()
+			.is_some_and(|normalized| normalized == *origin)
+	});
+
+	account_html_response(code, browser_error_page(&msg, start_over_origin))
+}
+
+pub(super) fn redirect_origin(redirect_uri: &str) -> Option<String> {
+	let url = Url::parse(redirect_uri).ok()?;
+	if !matches!(url.scheme(), "http" | "https") {
+		return None;
+	}
+
+	let origin = url.origin().ascii_serialization();
+	(origin != "null"
+		&& !origin
+			.chars()
+			.any(|c| c.is_ascii_whitespace() || matches!(c, ';' | ',')))
+	.then_some(origin)
+}
+
+fn browser_error_page(message: &str, start_over_origin: Option<&str>) -> String {
+	let msg = html_escape(message);
+	let href = html_escape(start_over_origin.unwrap_or("/_tuwunel/oidc/account"));
+
+	format!(
+		r#"<!DOCTYPE html>
+		<html lang="en">
+			<head>
+				{ACCOUNT_HEAD}
+				<title>Sign-in error</title>
+			</head>
+			<body>
+				<h1 class="err">Sign-in error</h1>
+				<p>{msg}</p>
+				<div class="nav">
+					<a href="{href}">Start over</a>
+				</div>
+			</body>
+		</html>"#
+	)
+}
+
 fn account_error_page(message: &str) -> String {
 	let msg = html_escape(message);
 

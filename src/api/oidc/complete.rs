@@ -7,9 +7,12 @@ use axum::{
 use http::StatusCode;
 use serde::Deserialize;
 use tuwunel_core::{Result, err, utils::html::escape as html_escape};
+use tuwunel_service::Services;
 use url::{Url, form_urlencoded};
 
-use super::account::{ACCOUNT_HEAD, account_html_response};
+use super::account::{
+	ACCOUNT_HEAD, account_html_response, browser_error_response, redirect_origin,
+};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct CompleteParams {
@@ -21,6 +24,19 @@ pub(crate) struct CompleteParams {
 pub(crate) async fn complete_route(
 	State(services): State<crate::State>,
 	request: axum::extract::Request,
+) -> Response {
+	let mut start_over_origin = None;
+
+	match complete(&services, request, &mut start_over_origin).await {
+		| Ok(response) => response,
+		| Err(error) => browser_error_response(&error, start_over_origin.as_deref()),
+	}
+}
+
+async fn complete(
+	services: &Services,
+	request: axum::extract::Request,
+	start_over_origin: &mut Option<String>,
 ) -> Result<Response> {
 	let query = request.uri().query().unwrap_or_default();
 	let params: CompleteParams = serde_html_form::from_str(query)?;
@@ -30,9 +46,10 @@ pub(crate) async fn complete_route(
 	// Validate the request before consuming the token, then consume the request
 	// only after the token succeeds. A forged request ID cannot burn a valid
 	// token, and a bad token cannot burn a retryable authorization request.
-	let _auth_req = oidc
+	let auth_req = oidc
 		.peek_auth_request(&params.oidc_req_id)
 		.await?;
+	*start_over_origin = redirect_origin(&auth_req.redirect_uri);
 
 	let user_id = services
 		.users

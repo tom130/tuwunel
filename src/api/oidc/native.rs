@@ -10,7 +10,7 @@ use ruma::{OwnedUserId, UserId};
 use serde::Deserialize;
 use serde_json::json;
 use tuwunel_core::{
-	Err, Result, err,
+	Err, Error, Result, err,
 	smallstr::SmallString,
 	utils::{self, hash, html::escape as html_escape},
 };
@@ -141,7 +141,7 @@ pub(crate) async fn native_get_route(
 	let view = params.view.as_deref().unwrap_or("login");
 	let form_action = match authorization_form_action_source(&services, context).await {
 		| Ok(source) => source,
-		| Err(e) => return account_error_response(&e),
+		| Err(e) => return expired_authorization_response(&e),
 	};
 	let html = render_page(&services, view, context, None).await;
 
@@ -197,7 +197,7 @@ pub(crate) async fn native_submit_route(
 			};
 			let form_action = match authorization_form_action_source(&services, context).await {
 				| Ok(source) => source,
-				| Err(context_error) => return account_error_response(&context_error),
+				| Err(context_error) => return expired_authorization_response(&context_error),
 			};
 
 			let msg = e.sanitized_message();
@@ -206,6 +206,30 @@ pub(crate) async fn native_submit_route(
 			native_html_response(e.status_code(), html, context, form_action.as_deref())
 		},
 	}
+}
+
+fn expired_authorization_response(error: &Error) -> Response {
+	account_html_response_with_form_action(
+		error.status_code(),
+		expired_authorization_page(),
+		None,
+	)
+}
+
+fn expired_authorization_page() -> String {
+	format!(
+		r#"<!DOCTYPE html>
+		<html lang="en">
+			<head>
+				{ACCOUNT_HEAD}
+				<title>Sign-in link expired</title>
+			</head>
+			<body>
+				<h1 class="err">Sign-in link expired</h1>
+				<p>This sign-in link has expired. Return to your app and start sign-in again.</p>
+			</body>
+		</html>"#
+	)
 }
 
 async fn native_submit(
@@ -636,7 +660,8 @@ mod tests {
 	use tuwunel_core::utils::html::TUWUNEL_CSP_VALUE;
 
 	use super::{
-		Flow, error_block, form_action_source, native_html_response, parse_flow, render_login,
+		Flow, error_block, expired_authorization_page, form_action_source, native_html_response,
+		parse_flow, render_login,
 	};
 
 	#[test]
@@ -678,6 +703,15 @@ mod tests {
 		assert_eq!(form_action_source("data:text/html,x"), None);
 		assert_eq!(form_action_source("not a URI"), None);
 		assert_eq!(form_action_source("https://a; script-src *"), None);
+	}
+
+	#[test]
+	fn expired_authorization_page_has_no_form() {
+		let html = expired_authorization_page();
+
+		assert!(html.contains("This sign-in link has expired"));
+		assert!(html.contains("Return to your app and start sign-in again"));
+		assert!(!html.contains("<form"));
 	}
 
 	#[test]
