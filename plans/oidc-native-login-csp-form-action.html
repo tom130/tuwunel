@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-08-31T20:15:00Z</dd>
-        <dt>modified</dt>     <dd>2026-08-31T21:52:44Z</dd>
-        <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code>, <code>99b7a40b</code></dd>
+        <dt>modified</dt>     <dd>2026-08-31T22:00:17Z</dd>
+        <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code>, <code>99b7a40b</code>, <code>6f07a2d4</code></dd>
         <dt>agent name</dt>   <dd>claude-opus-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>ce4a14e7-419f-4562-86b6-28371d1dfb71</dd>
         <dt>back refs</dt>    <dd>plans/archive/oauth-authorization-code-PLAN.md, plans/archive/msc4108-qr-login-PLAN.md, plans/deploy-config-1.8.2.md</dd>
@@ -458,22 +458,22 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 4: Lock the regression down</h3>
+      <h3><code class="status">[x]</code> Phase 4: Lock the regression down</h3>
       <p>This defect was introduced by a header-tidying commit and survived two releases because nothing tests the CSP against the flow it governs. Add the assertion that would have caught it.</p>
 
       <h4>1. Cross-origin completion regression test</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Add a test that drives <code>authorize</code> → native page → submit → <code>_complete</code> against a client registered with a cross-origin <code>redirect_uri</code>, asserting the sign-in page's <code>form-action</code> contains that client's origin.</li>
-        <li><code class="status">[]</code> Extend <code>src/main/tests/oauth_request_token.rs</code>, or add a sibling integration test there, so the assertion lives with the other end-to-end OAuth coverage.</li>
-        <li><code class="status">[]</code> Add a comment above <code>TUWUNEL_CSP</code> in <code>src/router/layers.rs</code> recording that <code>form-action</code> participates in redirect chains and that the OIDC auth pages deliberately override it.</li>
+        <li><code class="status">[x]</code> Add a test that drives <code>authorize</code> → native page → submit → <code>_complete</code> against a client registered with a cross-origin <code>redirect_uri</code>, asserting the sign-in page's <code>form-action</code> contains that client's origin.</li>
+        <li><code class="status">[x]</code> Extend <code>src/main/tests/oauth_request_token.rs</code>, or add a sibling integration test there, so the assertion lives with the other end-to-end OAuth coverage.</li>
+        <li><code class="status">[x]</code> Add a comment above <code>TUWUNEL_CSP</code> in <code>src/router/layers.rs</code> recording that <code>form-action</code> participates in redirect chains and that the OIDC auth pages deliberately override it.</li>
       </ul>
 
       <h4>2. Testing Strategy</h4>
       <p>Full-workspace run plus formatting and lints, matching CI.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>cargo test --workspace</code> — whole suite green.</li>
-        <li><code class="status">[]</code> <code>cargo fmt --all --check</code> — formatting matches the repo style.</li>
-        <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — clean.</li>
+        <li><code class="status">[x]</code> <code>cargo test --workspace</code> — whole suite green.</li>
+        <li><code class="status">[x]</code> <code>cargo fmt --all --check</code> — formatting matches the repo style.</li>
+        <li><code class="status">[x]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — clean.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -654,6 +654,10 @@ GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   404  Unknown or expir
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-09-01 — The self-contained OAuth regression stays in <code>native_auth</code></summary>
+      <p><code>src/main/tests/oauth_request_token.rs</code> is an opt-in external-provider probe that skips without environment credentials. The deterministic cross-origin flow therefore extends its sibling <code>src/main/tests/native_auth.rs</code>, where it registers a client and drives <code>authorize</code> → native page → credential submit → <code>_complete</code> against isolated storage. The existing router comment already records the Chromium redirect-chain rule after Phase 1 moved the shared CSP constant into <code>tuwunel_core</code>.</p>
+    </details>
     <details open>
       <summary>2026-08-31 — Browser-route response assertions use the server integration fixture</summary>
       <p>The <code>tuwunel_api</code> unit target covers the pure origin, escaping, expired-page, and existing placeholder-smuggling helpers. The route-level <code>text/html</code>, sanitized-body, safe-link, and no-<code>errcode</code> assertions require live OIDC client/request storage, so they run through the real API router in <code>src/main/tests/native_auth.rs</code>. Both planned API filters and the main integration binary pass.</p>

@@ -394,10 +394,8 @@ pub(super) fn account_html_response_with_form_action(
 	let policy = extra_source.map_or_else(
 		|| TUWUNEL_CSP_VALUE.to_owned(),
 		|source| {
-			TUWUNEL_CSP_VALUE.replace(
-				"form-action 'self'",
-				&format!("form-action 'self' {source}"),
-			)
+			TUWUNEL_CSP_VALUE
+				.replace("form-action 'self'", &format!("form-action 'self' {source}"))
 		},
 	);
 	let policy = HeaderValue::try_from(policy)

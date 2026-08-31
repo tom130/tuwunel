@@ -666,18 +666,12 @@ mod tests {
 
 	#[test]
 	fn non_authorization_flows_keep_strict_csp() {
-		for flow in [
-			Flow::Device("BCDF-GHJK"),
-			Flow::Account {
-				action: "org.matrix.sessions_list",
-				device_id: "",
-			},
-		] {
+		for flow in [Flow::Device("BCDF-GHJK"), Flow::Account {
+			action: "org.matrix.sessions_list",
+			device_id: "",
+		}] {
 			let response = native_html_response(StatusCode::OK, String::new(), flow, None);
-			assert_eq!(
-				response.headers()[CONTENT_SECURITY_POLICY],
-				TUWUNEL_CSP_VALUE
-			);
+			assert_eq!(response.headers()[CONTENT_SECURITY_POLICY], TUWUNEL_CSP_VALUE);
 		}
 	}
 

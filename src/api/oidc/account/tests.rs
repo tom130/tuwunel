@@ -15,10 +15,7 @@ fn authorization_csp_only_widens_form_action() {
 		Some("https://element.example"),
 	);
 
-	assert_eq!(
-		strict.headers()[CONTENT_SECURITY_POLICY],
-		TUWUNEL_CSP_VALUE
-	);
+	assert_eq!(strict.headers()[CONTENT_SECURITY_POLICY], TUWUNEL_CSP_VALUE);
 	assert_eq!(
 		widened.headers()[CONTENT_SECURITY_POLICY],
 		"default-src 'none';script-src 'self';style-src 'self';frame-ancestors 'none';form-action 'self' https://element.example;base-uri 'none'"
