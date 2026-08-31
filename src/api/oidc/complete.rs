@@ -27,10 +27,11 @@ pub(crate) async fn complete_route(
 
 	let oidc = services.oauth.get_server()?;
 
-	// Validate the auth request first (before consuming the login_token) so that
-	// a crafted request with an invalid oidc_req_id cannot burn a valid token.
-	let auth_req = oidc
-		.take_auth_request(&params.oidc_req_id)
+	// Validate the request before consuming the token, then consume the request
+	// only after the token succeeds. A forged request ID cannot burn a valid
+	// token, and a bad token cannot burn a retryable authorization request.
+	let _auth_req = oidc
+		.peek_auth_request(&params.oidc_req_id)
 		.await?;
 
 	let user_id = services
@@ -38,6 +39,13 @@ pub(crate) async fn complete_route(
 		.find_from_login_token(&params.login_token)
 		.await
 		.map_err(|_| err!(Request(Forbidden("Invalid or expired login token"))))?;
+
+	// Taking after token validation also serializes completion: a concurrent
+	// second submit observes the same not-found response and cannot issue a
+	// second authorization code.
+	let auth_req = oidc
+		.take_auth_request(&params.oidc_req_id)
+		.await?;
 
 	let code = oidc.create_auth_code(&auth_req, user_id);
 	let redirect_url = Url::parse(&auth_req.redirect_uri)

@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-08-31T20:15:00Z</dd>
-        <dt>modified</dt>     <dd>2026-08-31T21:26:06Z</dd>
-        <dt>commits</dt>      <dd><code>1f27e308</code></dd>
+        <dt>modified</dt>     <dd>2026-08-31T21:38:46Z</dd>
+        <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code></dd>
         <dt>agent name</dt>   <dd>claude-opus-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>ce4a14e7-419f-4562-86b6-28371d1dfb71</dd>
         <dt>back refs</dt>    <dd>plans/archive/oauth-authorization-code-PLAN.md, plans/archive/msc4108-qr-login-PLAN.md, plans/deploy-config-1.8.2.md</dd>
@@ -403,22 +403,22 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 2: Let a failed completion be retried</h3>
+      <h3><code class="status">[x]</code> Phase 2: Let a failed completion be retried</h3>
       <p>Independent of the CSP, a completion that fails for <em>any</em> reason currently destroys the pending authorization request, so the retry the user naturally attempts can only ever produce <code>M_NOT_FOUND</code>. Reorder to peek → validate → consume, preserving the existing anti-abuse property that a forged <code>oidc_req_id</code> cannot burn a valid login token.</p>
 
       <h4>1. Reorder <code>complete_route</code></h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Replace the <code>take_auth_request</code> call in <code>src/api/oidc/complete.rs:31-34</code> with <code>peek_auth_request</code>, keeping it as the first operation so an unknown id still short-circuits before the token is touched.</li>
-        <li><code class="status">[]</code> After <code>find_from_login_token</code> succeeds, call <code>take_auth_request</code>; treat a failure there as "already completed" and return the same <code>404</code>, which keeps code issuance at most once per request under a concurrent double-submit.</li>
-        <li><code class="status">[]</code> Update the explanatory comment to state both properties it now guarantees: a forged id cannot burn a token, <em>and</em> a bad token cannot burn a request.</li>
+        <li><code class="status">[x]</code> Replace the <code>take_auth_request</code> call in <code>src/api/oidc/complete.rs:31-34</code> with <code>peek_auth_request</code>, keeping it as the first operation so an unknown id still short-circuits before the token is touched.</li>
+        <li><code class="status">[x]</code> After <code>find_from_login_token</code> succeeds, call <code>take_auth_request</code>; treat a failure there as "already completed" and return the same <code>404</code>, which keeps code issuance at most once per request under a concurrent double-submit.</li>
+        <li><code class="status">[x]</code> Update the explanatory comment to state both properties it now guarantees: a forged id cannot burn a token, <em>and</em> a bad token cannot burn a request.</li>
       </ul>
 
       <h4>2. Testing Strategy</h4>
       <p>Handler-level tests around the ordering, mirroring the live probe that first exposed the defect.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api complete</code> — a bad login token returns <code>403</code> and a subsequent completion with a valid token on the same <code>oidc_req_id</code> succeeds.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api complete</code> — an unknown <code>oidc_req_id</code> returns <code>404</code> and leaves a concurrently valid login token still redeemable.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_service oauth</code> — <code>peek_auth_request</code> leaves the row present, <code>take_auth_request</code> removes it, and both reject an expired request with the unchanged message.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api complete</code> — a bad login token returns <code>403</code> and a subsequent completion with a valid token on the same <code>oidc_req_id</code> succeeds.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api complete</code> — an unknown <code>oidc_req_id</code> returns <code>404</code> and leaves a concurrently valid login token still redeemable.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_service oauth</code> — <code>peek_auth_request</code> leaves the row present, <code>take_auth_request</code> removes it, and both reject an expired request with the unchanged message.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -654,6 +654,10 @@ GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   404  Unknown or expir
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-08-31 — Completion ordering is exercised in the server integration fixture</summary>
+      <p>The retry and token-preservation assertions require real login-token and authorization-request storage, which the <code>tuwunel_api</code> unit target does not construct. The handler-level HTTP assertions therefore live in <code>src/main/tests/native_auth.rs</code> and run with <code>cargo test -p tuwunel --test native_auth</code>; the planned API and service filter commands also pass.</p>
+    </details>
     <details open>
       <summary>2026-08-31 — Share the CSP directives through <code>tuwunel_core</code></summary>
       <p><code>tuwunel_router</code> depends on <code>tuwunel_api</code>, so exporting <code>TUWUNEL_CSP</code> from the router for use by the API would introduce a dependency cycle. Phase 1 will move the shared directive list to <code>tuwunel_core</code>, which both crates already depend on, and keep the strict and per-request policies generated from that single definition.</p>

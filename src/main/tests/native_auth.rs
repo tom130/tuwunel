@@ -7,7 +7,7 @@ use std::{
 	time::{Duration, SystemTime},
 };
 
-use axum::{Router, body::Body};
+use axum::{Router, body::Body, response::Response};
 use http::{Request, StatusCode, header::CONTENT_SECURITY_POLICY};
 use tower::ServiceExt;
 use tuwunel::{Args, Runtime, Server};
@@ -117,20 +117,10 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 	}
 
 	oidc.store_auth_request("native-csp-test", &auth_request);
-	let (state, state_guard) = tuwunel_api::router::state::create(services.clone());
-	let router = tuwunel_api::router::build(
-		Router::<tuwunel_api::router::state::State>::new(),
-		&services.server,
-	)
-	.with_state(state);
 	let request = Request::get("/_tuwunel/oidc/native?oidc_req_id=native-csp-test&view=login")
 		.body(Body::empty())
 		.expect("the static native test URI must be valid");
-	let response = router
-		.oneshot(request)
-		.await
-		.expect("the API router service is infallible");
-	drop(state_guard);
+	let response = api_request(services, request).await;
 
 	assert_eq!(response.status(), StatusCode::OK);
 	let csp = response
@@ -154,6 +144,46 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 		})
 		.await?;
 
+	let retry_token = "native-completion-retry-token";
+	let _expires_in = services.users.create_login_token(&user_id, retry_token);
+	oidc.store_auth_request("native-completion-retry", &auth_request);
+	let request = Request::get(
+		"/_tuwunel/oidc/_complete?oidc_req_id=native-completion-retry&loginToken=invalid",
+	)
+	.body(Body::empty())
+	.expect("the static bad-token completion URI must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::FORBIDDEN);
+
+	let request = Request::get(format!(
+		"/_tuwunel/oidc/_complete?oidc_req_id=native-completion-retry&loginToken={retry_token}"
+	))
+	.body(Body::empty())
+	.expect("the retry completion URI must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
+
+	let preserved_token = "native-completion-preserved-token";
+	let _expires_in = services
+		.users
+		.create_login_token(&user_id, preserved_token);
+	let request = Request::get(format!(
+		"/_tuwunel/oidc/_complete?oidc_req_id=unknown-request&loginToken={preserved_token}"
+	))
+	.body(Body::empty())
+	.expect("the unknown-request completion URI must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::NOT_FOUND);
+
+	oidc.store_auth_request("native-completion-after-unknown", &auth_request);
+	let request = Request::get(format!(
+		"/_tuwunel/oidc/_complete?oidc_req_id=native-completion-after-unknown&loginToken={preserved_token}"
+	))
+	.body(Body::empty())
+	.expect("the preserved-token completion URI must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
+
 	// The native submit handler authenticates, mints a login token, and lets
 	// _complete consume it; exercise that token tail directly.
 	let token = "native-auth-test-login-token";
@@ -168,4 +198,21 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 	}
 
 	Ok(())
+}
+
+async fn api_request(services: &Arc<Services>, request: Request<Body>) -> Response {
+	let (state, state_guard) = tuwunel_api::router::state::create(services.clone());
+	let router = tuwunel_api::router::build(
+		Router::<tuwunel_api::router::state::State>::new(),
+		&services.server,
+	)
+	.with_state(state);
+	let response = router
+		.oneshot(request)
+		.await
+		.expect("the API router service is infallible");
+
+	drop(state_guard);
+
+	response
 }
