@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: Unbreak native OIDC browser login (CSP form-action)</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #16212e;
+  --muted: #5b6b7d;
+  --line: #dde3ea;
+  --accent: #0e7490;
+  --accent-soft: #e0f2f7;
+  --warn: #b45309;
+  --warn-soft: #fdf1e0;
+  --ok: #15803d;
+  --ok-soft: #e5f4e9;
+  --bad: #b91c1c;
+  --code-bg: #eef1f5;
+  --mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10161d;
+    --surface: #18212b;
+    --ink: #e4eaf1;
+    --muted: #93a3b5;
+    --line: #2a3644;
+    --accent: #38bdd8;
+    --accent-soft: #12303a;
+    --warn: #e0a04a;
+    --warn-soft: #33270f;
+    --ok: #4ade80;
+    --ok-soft: #10291a;
+    --bad: #f87171;
+    --code-bg: #202b37;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.6;
+  font-size: 16px;
+}
+main { max-width: 980px; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+h1 { font-size: 1.9rem; line-height: 1.25; letter-spacing: -0.02em; margin: 0 0 0.75rem; }
+h2 {
+  font-size: 1.35rem; letter-spacing: -0.01em; margin: 3rem 0 1rem;
+  padding-bottom: 0.4rem; border-bottom: 2px solid var(--accent);
+}
+h3 { font-size: 1.1rem; margin: 1.8rem 0 0.6rem; }
+h4 { font-size: 0.98rem; margin: 1.5rem 0 0.5rem; color: var(--accent); }
+p { margin: 0.6rem 0; }
+a { color: var(--accent); }
+code {
+  font-family: var(--mono); font-size: 0.85em;
+  background: var(--code-bg); padding: 0.12em 0.35em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.9rem 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.55;
+}
+pre code { background: none; padding: 0; }
+figure { margin: 2rem 0; text-align: center; }
+figure img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+figure svg {
+  max-width: 100%; height: auto; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.dlabel { font-family: var(--mono); font-size: 13px; fill: var(--muted); }
+.dlabel-strong { font-family: var(--mono); font-size: 14px; font-weight: 700; fill: var(--ink); }
+figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.6rem; }
+details.meta {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; margin: 1rem 0 2rem; font-size: 0.88rem;
+}
+details.meta summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+details.meta dl { display: grid; grid-template-columns: 9rem 1fr; gap: 0.25rem 1rem; margin: 0.8rem 0 0.3rem; }
+details.meta dt { font-weight: 600; color: var(--muted); }
+details.meta dd { margin: 0; font-family: var(--mono); font-size: 0.82rem; overflow-wrap: anywhere; }
+section { margin-bottom: 1rem; }
+.tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 0.1em 0.55em; border-radius: 999px; margin-right: 0.4em;
+}
+.tag.existing { background: var(--accent-soft); color: var(--accent); }
+.tag.new { background: var(--ok-soft); color: var(--ok); }
+.files ul { list-style: none; padding-left: 0; }
+.files li { padding: 0.3rem 0; border-bottom: 1px dashed var(--line); font-size: 0.92rem; }
+.phase {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 1.2rem 1.6rem 1.6rem; margin: 1.6rem 0;
+}
+.phase h3 { margin-top: 0.2rem; }
+code.status { color: var(--warn); font-weight: 700; background: var(--warn-soft); }
+ul.checklist { list-style: none; padding-left: 0.2rem; }
+ul.checklist li { padding: 0.28rem 0; font-size: 0.94rem; }
+.loop {
+  background: var(--warn-soft); border-left: 4px solid var(--warn);
+  padding: 0.7rem 1rem; border-radius: 6px; margin-top: 1.2rem; font-size: 0.92rem;
+}
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.88rem; }
+th, td { border: 1px solid var(--line); padding: 0.45rem 0.7rem; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+.evidence {
+  background: var(--accent-soft); border-left: 4px solid var(--accent);
+  padding: 0.7rem 1rem; border-radius: 6px; margin: 1rem 0; font-size: 0.92rem;
+}
+.rejected {
+  background: var(--surface); border: 1px dashed var(--line); border-radius: 8px;
+  padding: 0.8rem 1.1rem; margin: 0.8rem 0; font-size: 0.92rem;
+}
+.kpi { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+.table-scroll { overflow-x: auto; }
+#questionables details, #amendments details {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; margin: 0.8rem 0; font-size: 0.92rem;
+}
+#questionables summary, #amendments summary { cursor: pointer; font-weight: 600; }
+.qa-answer { margin: 0.5rem 0 0.2rem; }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- ===== HEADER + UPDATABLE METADATA ===== -->
+  <header>
+    <h1>Plan: Unbreak native OIDC browser login (CSP <code>form-action</code>)</h1>
+    <details class="meta">
+      <summary>Metadata</summary>
+      <dl>
+        <dt>created</dt>      <dd>2026-08-31T20:15:00Z</dd>
+        <dt>modified</dt>     <dd>2026-08-31T20:36:16Z</dd>
+        <dt>commits</dt>      <dd>—</dd>
+        <dt>agent name</dt>   <dd>claude-opus-5 (planf3 / create-plan)</dd>
+        <dt>session id</dt>   <dd>ce4a14e7-419f-4562-86b6-28371d1dfb71</dd>
+        <dt>back refs</dt>    <dd>plans/archive/oauth-authorization-code-PLAN.md, plans/archive/msc4108-qr-login-PLAN.md, plans/deploy-config-1.8.2.md</dd>
+        <dt>forward refs</dt> <dd>—</dd>
+      </dl>
+    </details>
+  </header>
+
+  <figure>
+    <svg viewBox="0 0 920 220" role="img" aria-label="The sign-in redirect chain, blocked at the final cross-origin hop">
+      <rect x="12" y="28" width="656" height="112" rx="10" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-dasharray="5 4"/>
+      <text x="24" y="20" class="dlabel" fill="var(--accent)">governed by the sign-in page CSP</text>
+
+      <g>
+        <rect x="28" y="62" width="176" height="56" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="116" y="86" text-anchor="middle" class="dlabel-strong">POST /oidc/native</text>
+        <text x="116" y="104" text-anchor="middle" class="dlabel">password accepted</text>
+      </g>
+      <path d="M212 90 H 250" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar)"/>
+
+      <g>
+        <rect x="258" y="62" width="176" height="56" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="346" y="86" text-anchor="middle" class="dlabel-strong">303 → /_complete</text>
+        <text x="346" y="104" text-anchor="middle" class="dlabel">same origin</text>
+      </g>
+      <path d="M442 90 H 480" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar)"/>
+
+      <g>
+        <rect x="488" y="62" width="176" height="56" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="576" y="86" text-anchor="middle" class="dlabel-strong">307 → client</text>
+        <text x="576" y="104" text-anchor="middle" class="dlabel">cross origin</text>
+      </g>
+
+      <path d="M672 90 H 716" stroke="var(--bad)" stroke-width="2" stroke-dasharray="6 5"/>
+      <g stroke="var(--bad)" stroke-width="3" stroke-linecap="round">
+        <path d="M686 78 L 704 102"/><path d="M704 78 L 686 102"/>
+      </g>
+      <text x="694" y="132" text-anchor="middle" class="dlabel" fill="var(--bad)">form-action 'self'</text>
+
+      <g opacity="0.55">
+        <rect x="726" y="62" width="176" height="56" rx="8" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <text x="814" y="86" text-anchor="middle" class="dlabel-strong">Element gets code</text>
+        <text x="814" y="104" text-anchor="middle" class="dlabel">never reached</text>
+      </g>
+
+      <text x="460" y="188" text-anchor="middle" class="dlabel">the browser stays on the sign-in page &#183; the user clicks again &#183; the request is already spent</text>
+      <text x="460" y="208" text-anchor="middle" class="dlabel-strong" fill="var(--bad)">M_NOT_FOUND: Unknown or expired authorization request</text>
+
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted)"/>
+        </marker>
+      </defs>
+    </svg>
+    <figcaption>The homeserver does its job correctly; Chromium refuses the last hop because the whole chain began as a form submission.</figcaption>
+  </figure>
+
+  <!-- ===== PURPOSE / PROBLEM / SOLUTION ===== -->
+  <section id="purpose">
+    <h2>Purpose</h2>
+    <p>Make native OIDC sign-in actually complete in a Chromium browser when the Matrix client lives on a different origin than the homeserver — the ordinary Element Web deployment. Today <span class="kpi">0</span> of <span class="kpi">5</span> observed sign-in attempts on <code>matrix.datadialect.cz</code> reached the token endpoint; the user is shown a raw JSON <code>M_NOT_FOUND</code> body instead of a session.</p>
+    <p><strong>Acceptance bar.</strong> After this plan: a password sign-in from Element Web in Chrome lands back on the client with <code>?code=&amp;state=</code> and produces exactly <span class="kpi">1</span> <code>POST /_tuwunel/oidc/token</code> in the ingress log; a <em>failed</em> completion leaves the pending authorization request intact so the next submit succeeds; and no browser-facing OIDC route ever renders a bare Matrix JSON error to a human.</p>
+    <p><strong>Out of scope.</strong> The upstream-IdP (SSO) login path beyond the shared <code>_complete</code> handler; the RFC 8628 device grant; MSC4108 QR login; the appservice/bridge 404 noise visible in the same logs; any change to PKCE, token lifetimes, or the client-registration endpoint.</p>
+  </section>
+
+  <section id="problem">
+    <h2>Problem</h2>
+    <p>Signing in through the built-in login page (<code>oidc_native_auth = true</code>) silently does nothing in Chrome. The password is accepted, the homeserver mints an authorization code and answers <code>307</code> toward the client's <code>redirect_uri</code> — and the browser discards that navigation. The user, seeing an unchanged form, submits again; the second attempt reuses the same <code>oidc_req_id</code>, which the first attempt already consumed, so the server answers <code>404</code> with the JSON body the user reported.</p>
+    <p>Two independent defects stack here. The first (<strong>D1</strong>) is the blocker: a global <code>Content-Security-Policy</code> with <code>form-action 'self'</code> is attached to every HTML response, including the sign-in page, and Chromium enforces <code>form-action</code> against <em>every hop</em> of a form submission's redirect chain — so the cross-origin final hop is refused. The second (<strong>D2</strong>) turns a recoverable hiccup into a dead end: <code>take_auth_request</code> deletes the pending request <em>before</em> the login token is validated, so any completion that fails for any reason burns the request permanently. A third, smaller defect (<strong>D3</strong>) is cosmetic but is what the user actually saw: the browser-facing <code>_complete</code> and <code>authorize</code> routes render Matrix JSON errors rather than the styled HTML error page every other OIDC page uses.</p>
+
+    <div class="evidence">
+      <strong>Verified live against the running deployment (2026-08-31, <code>kubectl --context OCI</code> + curl):</strong>
+      <ul>
+        <li><strong>The CSP is real and is ours.</strong> <code>GET /_tuwunel/oidc/native?oidc_req_id=…</code> returns <code>content-security-policy: default-src 'none';script-src 'self';style-src 'self';frame-ancestors 'none';form-action 'self';base-uri 'none'</code>. It is emitted by the app, not the ingress: <code>TUWUNEL_CSP</code> at <code>src/router/layers.rs:62-69</code>, applied to every <code>text/html</code> response by <code>html_layer()</code> at <code>src/router/layers.rs:258-279</code>. No ingress annotation sets any CSP.</li>
+        <li><strong>The final hop is cross-origin.</strong> Element registers <code>redirect_uri = https://element.datadialect.cz/?no_universal_links=true</code> while the page is served from <code>matrix.datadialect.cz</code>; <code>complete_route</code> answers <code>Redirect::temporary</code> (307) to that URL (<code>src/api/oidc/complete.rs:41-72</code>).</li>
+        <li><strong>The double-submit is systematic.</strong> Ingress logs show the identical shape in 5 of 5 attempts, e.g. <code>20:04:12 POST /native 303</code> → <code>20:04:12 GET /_complete?…&amp;loginToken=EUYj… 307</code> → <code>20:04:14 POST /native 303</code> → <code>20:04:15 GET /_complete?…&amp;loginToken=h7lS… 404</code>. Two different login tokens against one <code>oidc_req_id</code>: the page was submitted twice because the first navigation never happened.</li>
+        <li><strong>The client never gets the code.</strong> Across the full 3-hour window there is not a single <code>POST /_tuwunel/oidc/token</code> — and no <code>OPTIONS</code> preflight for it either, though the preflight for <code>/registration</code> is logged. The authorization code issued at 20:04:12 was never redeemed.</li>
+        <li><strong>D2 reproduced directly.</strong> Against a throwaway registered client: first <code>GET /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus…</code> → <code>403 M_FORBIDDEN: Invalid or expired login token</code>; second, identical request → <code>404 M_NOT_FOUND: Unknown or expired authorization request</code> — the user's exact error. <code>take_auth_request</code> removes the row at <code>src/service/oauth/server/auth.rs:113-115</code>, before <code>find_from_login_token</code> is ever called.</li>
+        <li><strong>D3 reproduced.</strong> <code>GET /_tuwunel/oidc/native?oidc_req_id=zzz&amp;view=login</code> returns <code>200</code> and renders a fully functional form bound to a request that does not exist.</li>
+        <li><strong>Not an infrastructure problem.</strong> One <code>tuwunel-datadialect</code> pod, 0 restarts, 26 days old — no split RocksDB state, no rollout window.</li>
+      </ul>
+    </div>
+
+    <figure>
+      <svg viewBox="0 0 920 300" role="img" aria-label="Observed request ladder for one sign-in attempt">
+        <text x="150" y="26" text-anchor="middle" class="dlabel-strong">browser</text>
+        <text x="700" y="26" text-anchor="middle" class="dlabel-strong">tuwunel</text>
+        <line x1="150" y1="38" x2="150" y2="268" stroke="var(--line)" stroke-width="2"/>
+        <line x1="700" y1="38" x2="700" y2="268" stroke="var(--line)" stroke-width="2"/>
+
+        <text x="60" y="76" class="dlabel">20:04:12</text>
+        <path d="M156 70 H 694" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar2)"/>
+        <text x="425" y="62" text-anchor="middle" class="dlabel">POST /native</text>
+        <text x="760" y="76" class="dlabel" fill="var(--ok)">303</text>
+
+        <text x="60" y="126" class="dlabel">20:04:12</text>
+        <path d="M156 120 H 694" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar2)"/>
+        <text x="425" y="112" text-anchor="middle" class="dlabel">GET /_complete &#183; token A</text>
+        <text x="760" y="126" class="dlabel" fill="var(--ok)">307</text>
+        <text x="425" y="144" text-anchor="middle" class="dlabel" fill="var(--bad)">navigation refused &#183; page unchanged</text>
+
+        <text x="60" y="196" class="dlabel">20:04:14</text>
+        <path d="M156 190 H 694" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar2)"/>
+        <text x="425" y="182" text-anchor="middle" class="dlabel">POST /native &#183; user clicks again</text>
+        <text x="760" y="196" class="dlabel" fill="var(--ok)">303</text>
+
+        <text x="60" y="246" class="dlabel">20:04:15</text>
+        <path d="M156 240 H 694" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar2)"/>
+        <text x="425" y="232" text-anchor="middle" class="dlabel">GET /_complete &#183; token B</text>
+        <text x="760" y="246" class="dlabel-strong" fill="var(--bad)">404</text>
+
+        <text x="460" y="288" text-anchor="middle" class="dlabel">no token exchange follows, in any attempt</text>
+
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+      </svg>
+      <figcaption>One attempt, reconstructed from <code>ingress-nginx</code> access logs. The <code>404</code> the user reports is the second submit, not the first failure.</figcaption>
+    </figure>
+  </section>
+
+  <section id="solution">
+    <h2>Solution</h2>
+    <p>Keep the hardened global CSP, but let the pages that exist <em>specifically to hand the browser to a registered OAuth client</em> say so. The native sign-in and registration pages, when bound to an authorization request, emit their own <code>Content-Security-Policy</code> whose <code>form-action</code> lists <code>'self'</code> plus the origin of that request's already-validated <code>redirect_uri</code>. Nothing else about the policy changes, and no other HTML response is touched — <code>html_layer()</code> uses <code>.entry().or_insert()</code>, so a header set by the handler already wins.</p>
+    <p>Then remove the trap underneath it: <code>_complete</code> switches from <em>take-then-validate</em> to <em>peek → validate → consume</em>. A bogus <code>oidc_req_id</code> still cannot burn a valid login token (the peek fails first, exactly as the current comment intends), but a failed or blocked completion now leaves the pending request alive, so the very next submit works. Finally, the browser-facing routes get the same styled HTML error page the rest of the OIDC surface uses, with a link that restarts the flow, and the sign-in page refuses to render a form for a request that no longer exists.</p>
+
+    <figure>
+      <svg viewBox="0 0 920 300" role="img" aria-label="The two fixes: scoped form-action, and peek before consume">
+        <rect x="20" y="20" width="420" height="252" rx="10" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="230" y="50" text-anchor="middle" class="dlabel-strong" fill="var(--accent)">1 &#183; scope form-action</text>
+        <rect x="48" y="70" width="364" height="44" rx="6" fill="var(--code-bg)" stroke="var(--line)"/>
+        <text x="230" y="97" text-anchor="middle" class="dlabel">AuthRequest.redirect_uri</text>
+        <path d="M230 118 V 146" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar3)"/>
+        <rect x="48" y="150" width="364" height="44" rx="6" fill="var(--code-bg)" stroke="var(--line)"/>
+        <text x="230" y="177" text-anchor="middle" class="dlabel">origin only, scheme + host + port</text>
+        <path d="M230 198 V 226" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar3)"/>
+        <rect x="48" y="230" width="364" height="26" rx="6" fill="var(--ok-soft)" stroke="var(--ok)"/>
+        <text x="230" y="248" text-anchor="middle" class="dlabel" fill="var(--ok)">form-action 'self' https://element…</text>
+
+        <rect x="480" y="20" width="420" height="252" rx="10" fill="var(--surface)" stroke="var(--line)" stroke-width="1.5"/>
+        <text x="690" y="50" text-anchor="middle" class="dlabel-strong" fill="var(--accent)">2 &#183; peek before consume</text>
+        <rect x="508" y="70" width="364" height="34" rx="6" fill="var(--code-bg)" stroke="var(--line)"/>
+        <text x="690" y="92" text-anchor="middle" class="dlabel">peek request &#183; unknown id stops here</text>
+        <path d="M690 108 V 130" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar3)"/>
+        <rect x="508" y="134" width="364" height="34" rx="6" fill="var(--code-bg)" stroke="var(--line)"/>
+        <text x="690" y="156" text-anchor="middle" class="dlabel">verify login token</text>
+        <path d="M690 172 V 194" stroke="var(--muted)" stroke-width="2" marker-end="url(#ar3)"/>
+        <rect x="508" y="198" width="364" height="34" rx="6" fill="var(--code-bg)" stroke="var(--line)"/>
+        <text x="690" y="220" text-anchor="middle" class="dlabel">consume, then issue the code</text>
+        <rect x="508" y="242" width="364" height="26" rx="6" fill="var(--ok-soft)" stroke="var(--ok)"/>
+        <text x="690" y="260" text-anchor="middle" class="dlabel" fill="var(--ok)">failure leaves the request usable</text>
+
+        <defs>
+          <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted)"/>
+          </marker>
+        </defs>
+      </svg>
+      <figcaption>Left: the policy is derived from data the server already validated at <code>/authorize</code>. Right: the ordering that satisfies both safety properties at once.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== RELEVANT FILES ===== -->
+  <section id="files" class="files">
+    <h2>Relevant Files</h2>
+
+    <h3>Existing Files</h3>
+    <ul>
+      <li><span class="tag existing">existing</span> <code>src/router/layers.rs</code> — <code>TUWUNEL_CSP</code> (<code>:62-69</code>) holds the offending <code>form-action 'self'</code>; <code>html_layer()</code> (<code>:258-279</code>) attaches it to every <code>text/html</code> response with <code>.entry().or_insert()</code>, which is precisely the hook that lets a handler override it.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/native.rs</code> — the sign-in/registration page. <code>native_get_route</code> (<code>:70-95</code>) renders without checking the request exists (D3); <code>render_page</code>/<code>render_login</code> (<code>:333-390</code>) build the HTML; <code>complete_redirect</code> (<code>:296-322</code>) issues the <code>303</code> into <code>_complete</code>.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/complete.rs</code> — <code>complete_route</code> (<code>:22-77</code>): takes the auth request before validating the login token (D2) and returns <code>Result&lt;Response&gt;</code>, so every error becomes Matrix JSON in the address bar (D3).</li>
+      <li><span class="tag existing">existing</span> <code>src/service/oauth/server/auth.rs</code> — <code>AuthRequest</code>, <code>store_auth_request</code> (<code>:96-101</code>), and <code>take_auth_request</code> (<code>:103-120</code>), which removes the row on <code>:115</code> before the expiry check and before any caller validation.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/account.rs</code> — <code>account_html_response</code> (<code>:372-378</code>), <code>account_redirect_response</code> (<code>:357-369</code>) and <code>account_error_response</code> (<code>:380-386</code>): the shared response helpers where a per-response CSP belongs, and the styled error page <code>_complete</code> should be using.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/authorize.rs</code> — <code>authorize_route</code> (<code>:36-150</code>) validates <code>redirect_uri</code> against the registered client (<code>:170-182</code>) and stores the request at <code>:124</code>; the origin used in the CSP is trustworthy precisely because of this check.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/router.rs</code> — OIDC route table (<code>:430-453</code>); confirms <code>_complete</code> is a plain browser <code>GET</code> navigation, not an API call.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/device.rs</code>, <code>src/api/oidc/account.rs</code> — the other two <code>Flow</code>s that share the login page; both redirect same-origin and must keep the strict policy unchanged.</li>
+    </ul>
+
+    <h3>New Files</h3>
+    <ul>
+      <li><span class="tag new">new</span> <em>None.</em> Every change lands in files that already exist; new tests live in the existing <code>#[cfg(test)] mod tests</code> blocks of <code>native.rs</code>, <code>complete.rs</code> and <code>auth.rs</code>.</li>
+    </ul>
+  </section>
+
+  <!-- ===== IMPLEMENTATION PHASES ===== -->
+  <section id="phases">
+    <h2>Implementation Phases</h2>
+    <p><strong>IMPORTANT:</strong> Execute every phase and task step by step, in order, top to bottom.</p>
+    <p>Status markers: <code>[]</code> idle · <code>[wip]</code> in progress · <code>[x]</code> complete · <code>[f]</code> failed. All start as <code>[]</code>; the executing workflow updates them as it works.</p>
+
+    <div class="phase">
+      <h3><code class="status">[x]</code> Phase 0: Confirm the CSP violation in the browser</h3>
+      <p>Everything downstream rests on one browser-side claim: that Chromium refuses the cross-origin hop of a form submission's redirect chain. The server-side facts are already verified; this phase closes the last link before any code is written, and defines the pivot if it does not hold.</p>
+
+      <h4>1. Reproduce with DevTools open</h4>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> Reproduce the production redirect-chain shape in Chrome with the exact served CSP. A deterministic local harness was used because no production account credentials were available to the execution agent.</li>
+        <li><code class="status">[x]</code> Submit the harness form <strong>once</strong> and stop: the source recorded exactly one POST and issued one <code>307</code>.</li>
+        <li><code class="status">[x]</code> Capture Chrome's console line: <code>Sending form data to 'http://127.0.0.1:18081/submit' violates the following Content Security Policy directive: "form-action 'self'". The request has been blocked.</code></li>
+        <li><code class="status">[x]</code> Confirm Chrome stayed on the sign-in form after the source returned <code>307</code>, and the cross-origin target recorded zero requests.</li>
+        <li><code class="status">[x]</code> Cross-check the same one-submit harness in Firefox: Firefox followed the POST and its <code>307</code> to the cross-origin target.</li>
+      </ul>
+
+      <h4>2. Record the branch decision</h4>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> The violation appears — proceed to Phase 1 unchanged.</li>
+        <li><code class="status">[x]</code> The client-side callback branch was evaluated and not taken: Chrome never requested the redirect target.</li>
+        <li><code class="status">[x]</code> Append the finding (with the verbatim console line) to the <code>#notes</code> section of this plan.</li>
+      </ul>
+
+      <h4>3. Testing Strategy</h4>
+      <p>Manual browser observation is the only instrument that can see a blocked navigation — it produces no request, so no server-side or ingress log can record it. Both browsers are exercised to distinguish a CSP block from a client-side failure.</p>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> <code>curl -sD- -o/dev/null "https://matrix.datadialect.cz/_tuwunel/oidc/native?oidc_req_id=x&amp;view=login" | grep -i content-security</code> — re-confirms the policy is still being served before interpreting the console.</li>
+        <li><code class="status">[x]</code> <code>kubectl --context OCI -n kube-system logs -l app.kubernetes.io/name=ingress-nginx --since=4h | grep _tuwunel/oidc</code> — the production attempts show one first-submit <code>POST /native</code> and one <code>307</code>, no token exchange, then the systematic second-submit <code>404</code>.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 1: Scope <code>form-action</code> to the pending client</h3>
+      <p>The blocker fix. The authorization-flow pages emit a CSP that permits the one cross-origin destination the flow is designed to reach, derived from the <code>redirect_uri</code> that <code>authorize_route</code> already validated against the registered client. The global policy, and every other HTML response, are untouched.</p>
+
+      <h4>1. Add a non-destructive read of the authorization request</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>src/service/oauth/server/auth.rs</code>, add <code>peek_auth_request(&amp;self, req_id: &amp;str) -&gt; Result&lt;AuthRequest&gt;</code>: identical to <code>take_auth_request</code> including the expiry check, but without the <code>remove</code>.</li>
+        <li><code class="status">[]</code> Refactor <code>take_auth_request</code> to call <code>peek_auth_request</code> and then <code>remove</code>, so the two cannot drift apart.</li>
+        <li><code class="status">[]</code> Keep both error messages exactly as they are — they are asserted by tests and read by operators.</li>
+      </ul>
+
+      <h4>2. Derive a CSP source expression from a redirect URI</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Add a private helper in <code>src/api/oidc/native.rs</code>: <code>fn form_action_source(redirect_uri: &amp;str) -&gt; Option&lt;String&gt;</code>.</li>
+        <li><code class="status">[]</code> For <code>http</code>/<code>https</code>, return the serialized origin (<code>scheme://host[:port]</code>) via <code>Url::origin().ascii_serialization()</code> — never the path or query, so <code>…/?no_universal_links=true</code> contributes nothing.</li>
+        <li><code class="status">[]</code> For any other scheme (RFC 8252 private-use schemes such as <code>io.element.android</code>), return <code>Some(format!("{scheme}:"))</code>, a valid CSP scheme-source. These clients already take the interstitial path, so this is belt-and-braces.</li>
+        <li><code class="status">[]</code> Return <code>None</code> when the URI fails to parse or the serialized origin is opaque (<code>"null"</code>), and reject any candidate containing whitespace, <code>;</code> or <code>,</code> so a source expression can never break out of the header.</li>
+      </ul>
+
+      <h4>3. Emit the per-page policy</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>src/api/oidc/account.rs</code>, add <code>account_html_response_with_form_action(status, html, extra_source: Option&lt;&amp;str&gt;) -&gt; Response</code> that sets <code>CONTENT_SECURITY_POLICY</code> explicitly, reusing the same directive list as <code>TUWUNEL_CSP</code> with <code>form-action 'self' &lt;extra_source&gt;</code>.</li>
+        <li><code class="status">[]</code> Export the directive list from <code>tuwunel_router</code> (or mirror it in one <code>const</code> in <code>account.rs</code>) so the two policies cannot silently diverge; add a unit test asserting the non-<code>form-action</code> directives are byte-identical to <code>TUWUNEL_CSP</code>.</li>
+        <li><code class="status">[]</code> In <code>native_get_route</code> and the error re-render path of <code>native_submit_route</code>, for <code>Flow::Authorization(req_id)</code> only, peek the request and pass its <code>form_action_source</code> through.</li>
+        <li><code class="status">[]</code> Leave <code>Flow::Device</code> and <code>Flow::Account</code> on the strict global policy — both complete same-origin and gain nothing from a wider <code>form-action</code>.</li>
+      </ul>
+
+      <h4>4. Testing Strategy</h4>
+      <p>Unit tests over the pure helpers (a URL in, a source expression out) plus assertions on the assembled header. The end-to-end proof is deferred to Phase 5, where a real browser is available.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — <code>form_action_source</code> covers: https with path+query → origin only; https with a non-default port → port retained; <code>io.element.android:/cb</code> → <code>io.element.android:</code>; <code>javascript:alert(1)</code> and <code>data:text/html,x</code> → rejected; malformed input → <code>None</code>; an injected <code>"https://a; script-src *"</code> → <code>None</code>.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api csp</code> — the assembled header for an authorization flow contains <code>form-action 'self' https://element.datadialect.cz</code> and still contains <code>default-src 'none'</code> and <code>base-uri 'none'</code>; the device and account flows contain <code>form-action 'self'</code> with nothing appended.</li>
+        <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — no new lints.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 2: Let a failed completion be retried</h3>
+      <p>Independent of the CSP, a completion that fails for <em>any</em> reason currently destroys the pending authorization request, so the retry the user naturally attempts can only ever produce <code>M_NOT_FOUND</code>. Reorder to peek → validate → consume, preserving the existing anti-abuse property that a forged <code>oidc_req_id</code> cannot burn a valid login token.</p>
+
+      <h4>1. Reorder <code>complete_route</code></h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Replace the <code>take_auth_request</code> call in <code>src/api/oidc/complete.rs:31-34</code> with <code>peek_auth_request</code>, keeping it as the first operation so an unknown id still short-circuits before the token is touched.</li>
+        <li><code class="status">[]</code> After <code>find_from_login_token</code> succeeds, call <code>take_auth_request</code>; treat a failure there as "already completed" and return the same <code>404</code>, which keeps code issuance at most once per request under a concurrent double-submit.</li>
+        <li><code class="status">[]</code> Update the explanatory comment to state both properties it now guarantees: a forged id cannot burn a token, <em>and</em> a bad token cannot burn a request.</li>
+      </ul>
+
+      <h4>2. Testing Strategy</h4>
+      <p>Handler-level tests around the ordering, mirroring the live probe that first exposed the defect.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api complete</code> — a bad login token returns <code>403</code> and a subsequent completion with a valid token on the same <code>oidc_req_id</code> succeeds.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api complete</code> — an unknown <code>oidc_req_id</code> returns <code>404</code> and leaves a concurrently valid login token still redeemable.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_service oauth</code> — <code>peek_auth_request</code> leaves the row present, <code>take_auth_request</code> removes it, and both reject an expired request with the unchanged message.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 3: Stop showing JSON to humans; fail fast on dead requests</h3>
+      <p>What the user actually pasted was a raw Matrix error object rendered as a web page. Every OIDC page except the two browser-navigation routes already renders <code>account_error_response</code>. Align them, and stop serving a working-looking form for a request that no longer exists.</p>
+
+      <h4>1. HTML errors on browser-facing routes</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Change <code>complete_route</code> to return <code>Response</code>, wrapping the fallible body and mapping errors through <code>account_error_response</code> — the same shape <code>native_get_route</code> already uses at <code>src/api/oidc/native.rs:70-95</code>.</li>
+        <li><code class="status">[]</code> Do the same for <code>authorize_route</code> in <code>src/api/oidc/authorize.rs</code>, so a bad <code>redirect_uri</code> or a missing provider is legible rather than a JSON blob.</li>
+        <li><code class="status">[]</code> Add a "Start over" link to the error page for these two routes pointing at the client's own origin when it is known, and otherwise at <code>/_tuwunel/oidc/account</code>.</li>
+        <li><code class="status">[]</code> Keep <code>sanitized_message()</code> as the only text source so no internal detail leaks into the page.</li>
+      </ul>
+
+      <h4>2. Reject dead authorization requests at page render</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>native_get_route</code>, for <code>Flow::Authorization</code>, peek the request first and render an explicit "this sign-in link has expired — return to your app and start again" page instead of a form when it is missing or expired.</li>
+        <li><code class="status">[]</code> Reuse the peek already introduced in Phase 1 so the page is not read twice.</li>
+      </ul>
+
+      <h4>3. Testing Strategy</h4>
+      <p>Assert on content type and body shape, which is exactly what regressed: the routes must never answer a navigation with <code>application/json</code>.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — an error from <code>complete_route</code> and from <code>authorize_route</code> yields <code>text/html</code>, contains the sanitized message, and contains no <code>errcode</code> string.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api native</code> — an unknown <code>oidc_req_id</code> renders the expired page and no <code>&lt;form</code> element.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — existing XSS/placeholder-smuggling tests in <code>native.rs</code> still pass unmodified.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 4: Lock the regression down</h3>
+      <p>This defect was introduced by a header-tidying commit and survived two releases because nothing tests the CSP against the flow it governs. Add the assertion that would have caught it.</p>
+
+      <h4>1. Cross-origin completion regression test</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Add a test that drives <code>authorize</code> → native page → submit → <code>_complete</code> against a client registered with a cross-origin <code>redirect_uri</code>, asserting the sign-in page's <code>form-action</code> contains that client's origin.</li>
+        <li><code class="status">[]</code> Extend <code>src/main/tests/oauth_request_token.rs</code>, or add a sibling integration test there, so the assertion lives with the other end-to-end OAuth coverage.</li>
+        <li><code class="status">[]</code> Add a comment above <code>TUWUNEL_CSP</code> in <code>src/router/layers.rs</code> recording that <code>form-action</code> participates in redirect chains and that the OIDC auth pages deliberately override it.</li>
+      </ul>
+
+      <h4>2. Testing Strategy</h4>
+      <p>Full-workspace run plus formatting and lints, matching CI.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo test --workspace</code> — whole suite green.</li>
+        <li><code class="status">[]</code> <code>cargo fmt --all --check</code> — formatting matches the repo style.</li>
+        <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — clean.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 5: Ship it and verify against the live deployment</h3>
+      <p>The fix only counts when a real Chrome completes a real sign-in on <code>datadialect.cz</code>. Verification is a log assertion, not an impression: exactly one token exchange per sign-in.</p>
+
+      <h4>1. Build and roll out</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Commit the change on a branch off <code>main</code> and push; let the fork CI build and publish <code>ghcr.io/tom130/tuwunel</code>.</li>
+        <li><code class="status">[]</code> Update the image digest in the <code>oci-flux</code> GitOps repo for <code>matrix-datadialect/tuwunel-datadialect</code> and let Flux reconcile.</li>
+        <li><code class="status">[]</code> <code>kubectl --context OCI -n matrix-datadialect rollout status deploy/tuwunel-datadialect</code> — the new pod is ready.</li>
+      </ul>
+
+      <h4>2. Verify end to end</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Confirm the served policy changed: the sign-in page's <code>form-action</code> now lists the Element origin, while <code>/_tuwunel/oidc/account</code> still shows <code>form-action 'self'</code>.</li>
+        <li><code class="status">[]</code> Sign in from Element Web in Chrome with a <strong>single</strong> submit and reach a synced session.</li>
+        <li><code class="status">[]</code> Deliberately mistype the password once, then sign in correctly on the same page — the second attempt must succeed, proving Phase 2.</li>
+      </ul>
+
+      <h4>3. Testing Strategy</h4>
+      <p>Ingress access logs are the ground truth; they already recorded the failure precisely, so the same query proves the fix.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>kubectl --context OCI -n kube-system logs -l app.kubernetes.io/name=ingress-nginx --since=15m | grep -E "_tuwunel/oidc/(token|_complete)"</code> — shows one <code>_complete</code> <code>307</code> followed by one <code>POST /token 200</code>, and no <code>404</code>.</li>
+        <li><code class="status">[]</code> <code>kubectl --context OCI -n matrix-datadialect logs deploy/tuwunel-datadialect -c app --since=15m | grep -i oidc</code> — one client registration per sign-in, no repeated retry storm.</li>
+        <li><code class="status">[]</code> Repeat the sign-in in Firefox and Safari (or Element X against the same server) to confirm no regression on the paths that already worked.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GLOBAL VALIDATION ===== -->
+  <section id="validation">
+    <h2>Validation Commands</h2>
+    <p>Execute these commands to validate the entire plan is complete:</p>
+    <ul class="checklist">
+      <li><code class="status">[]</code> <code>cargo test --workspace</code> — every unit and integration test passes, including the new CSP and retry coverage.</li>
+      <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — no new lints from the added helpers.</li>
+      <li><code class="status">[]</code> <code>cargo fmt --all --check</code> — formatting matches CI.</li>
+      <li><code class="status">[]</code> <code>curl -sD- -o/dev/null "https://matrix.datadialect.cz/_tuwunel/oidc/native?oidc_req_id=$RID&amp;view=login" | grep -i content-security</code> — the live sign-in page advertises the widened <code>form-action</code> for a live <code>$RID</code>.</li>
+      <li><code class="status">[]</code> <code>curl -sD- -o/dev/null "https://matrix.datadialect.cz/_tuwunel/oidc/account" | grep -i content-security</code> — unrelated pages keep <code>form-action 'self'</code>.</li>
+      <li><code class="status">[]</code> <code>curl -s "https://matrix.datadialect.cz/_tuwunel/oidc/_complete?oidc_req_id=$RID&amp;loginToken=bogus" | head -c 200</code> — twice in a row: both responses are HTML, and the second is <em>not</em> <code>M_NOT_FOUND</code>.</li>
+      <li><code class="status">[]</code> <code>kubectl --context OCI -n kube-system logs -l app.kubernetes.io/name=ingress-nginx --since=15m | grep _tuwunel/oidc/token</code> — a token exchange exists, which never happened before this plan.</li>
+    </ul>
+    <div class="table-scroll">
+      <table>
+        <tr><th>Check</th><th>Query / method</th><th>Acceptance bar</th></tr>
+        <tr><td>Chrome completes sign-in</td><td>Element Web in Chrome, one submit, DevTools console open</td><td>Session reached; zero CSP violations logged</td></tr>
+        <tr><td>Requests per sign-in</td><td><code>grep -c "POST /_tuwunel/oidc/native"</code> over one attempt</td><td>Exactly 1</td></tr>
+        <tr><td>Token exchange</td><td><code>grep "POST /_tuwunel/oidc/token"</code> over one attempt</td><td>Exactly 1, status 200</td></tr>
+        <tr><td>Retry after a wrong password</td><td>Mistype once, then sign in correctly on the same page</td><td>Second attempt succeeds; no <code>404</code></td></tr>
+        <tr><td>No JSON shown to a human</td><td>Force an error on <code>_complete</code> and <code>authorize</code> in a browser</td><td><code>text/html</code> page with a start-over link</td></tr>
+        <tr><td>Other browsers unaffected</td><td>Firefox and Element X against the same server</td><td>Sign-in still succeeds</td></tr>
+        <tr><td>Hardening preserved</td><td>Any non-OIDC HTML response</td><td><code>form-action 'self'</code>, unchanged</td></tr>
+      </table>
+    </div>
+    <div class="loop">
+      🔁 <strong>The plan is not complete until every box is checked and every command passes. If for some reason a step is not possible to complete, mark it with [f] and move on if possible.</strong>
+    </div>
+  </section>
+
+  <!-- ===== QUESTIONABLES ===== -->
+  <section id="questionables">
+    <h2>Questionables</h2>
+
+    <details>
+      <summary>Is the Chromium <code>form-action</code>-on-redirects behaviour certain enough to build on?</summary>
+      <p class="qa-answer">It is the leading explanation, not yet an eyewitnessed one, which is exactly why Phase 0 exists as a gate. The browser-behaviour divergence is documented (Chromium enforces <code>form-action</code> against redirects; Gecko does not), and every server-side observation fits it: a <code>307</code> issued and never followed, zero token exchanges across five attempts, a second form POST about two seconds later, and the app-scheme clients that route through the <code>needs_interstitial</code> link — a click, not a form submission — being unaffected. If Phase 0 shows no violation, Phases 2–4 remain valid on their own and Phase 1 is re-scoped.</p>
+    </details>
+
+    <details>
+      <summary>Scope <code>form-action</code> per request, or simply drop the directive?</summary>
+      <p class="qa-answer">Dropping <code>form-action</code> from <code>TUWUNEL_CSP</code> is a two-character fix and would work. It is rejected as the primary approach because it weakens every HTML surface the server has — admin, media, account management — to fix one page, and because <code>form-action</code> is the specific mitigation against a dangling-markup injection retargeting a password form. Per-request scoping costs one helper and one response builder, and the value it inserts is the <code>redirect_uri</code> the server itself validated against the registered client minutes earlier. If review prefers the smaller diff, the fallback is <code>form-action 'self' https:</code> on the OIDC pages only — still narrower than removing the directive.</p>
+    </details>
+
+    <details>
+      <summary>Can two concurrent completions still race for one authorization request?</summary>
+      <p class="qa-answer">In principle yes: peek is not atomic with take, so two simultaneous <code>_complete</code> calls could both peek before either takes. Phase 2 narrows the window by consuming immediately before issuing the code and treating a failed take as "already completed", which means at most one code is issued in practice. Closing it fully needs a compare-and-delete the current <code>Map</code> API does not expose. The residual risk is small — an attacker would need a second valid, unexpired, single-use login token for the same request inside the same few milliseconds — but it should be recorded rather than assumed away.</p>
+    </details>
+
+    <details>
+      <summary>Should the <code>_complete</code> interstitial simply be used for every client?</summary>
+      <p class="qa-answer">It would sidestep the CSP entirely — a link click is not a form submission — and it is already the path for private-use schemes and native <code>https</code> universal links. It is not the primary fix because it adds a mandatory extra click to every web sign-in, which is a permanent UX tax paid to work around a header we control. It stays on the table as a fallback if per-request CSP scoping proves awkward for some client shape.</p>
+    </details>
+
+    <details>
+      <summary>Is there anything to unblock the user before a rebuild?</summary>
+      <p class="qa-answer">Two things. Signing in through Firefox should work today, since it does not apply <code>form-action</code> to redirects — worth confirming in Phase 0 anyway. And an <code>ingress-nginx</code> <code>configuration-snippet</code> using <code>more_set_headers</code> on the <code>/_tuwunel/oidc/</code> location can overwrite the app's CSP without touching the image; note that snippet annotations are disabled by default in ingress-nginx ≥ 1.9 and would have to be enabled cluster-wide, which is its own security decision. Both are stopgaps, not the fix.</p>
+    </details>
+  </section>
+
+  <!-- ===== NOTES ===== -->
+  <section id="notes">
+    <h2>Notes</h2>
+
+    <h3>Phase 0 browser confirmation</h3>
+    <p>On 2026-08-31, an automated two-origin harness replayed the production response shape with the exact live CSP. Chrome 148 submitted once to the same-origin endpoint, received a <code>307</code>, stayed on the form, and made zero requests to the cross-origin target. Its verbatim console line was:</p>
+    <pre><code>Sending form data to 'http://127.0.0.1:18081/submit' violates the following Content Security Policy directive: "form-action 'self'". The request has been blocked.</code></pre>
+    <p>Firefox 151 submitted the identical form and followed the same <code>307</code> to the target. A fresh live header probe confirmed that <code>matrix.datadialect.cz</code> still serves the exact tested policy; the four-hour ingress window independently retained the recorded production POST → 307 → second POST → 404 sequences and no token exchange.</p>
+
+    <h3>How the regression got in</h3>
+    <p>The directive has changed three times, and the current value is newer than the feature it breaks. Native OIDC login shipped on 2026-06-28; the policy that breaks it landed three weeks later in a commit whose subject is <em>Cleanup headers</em>.</p>
+    <div class="table-scroll">
+      <table>
+        <tr><th>Date</th><th>Commit</th><th><code>form-action</code></th><th>Effect on native login</th></tr>
+        <tr><td>2024-06-03</td><td><code>893cc505</code> csp: set <code>form-action 'none'</code></td><td><code>'none'</code></td><td>No native login page existed yet</td></tr>
+        <tr><td>2026-03-22</td><td><code>a87b8bad</code> MSC2454 SSO UIA</td><td><code>'none'</code></td><td>—</td></tr>
+        <tr><td>2026-06-28</td><td><code>db1c68c6</code> Serve native account registration and login (#479)</td><td><code>'none'</code></td><td>Even the same-origin POST is refused</td></tr>
+        <tr><td>2026-07-12</td><td><code>ee64278d</code> Fix the native login redirect completion (#504, #505)</td><td><code>'none'</code></td><td>Redirect logic fixed; policy untouched</td></tr>
+        <tr><td>2026-07-20</td><td><code>9bace37e</code> Cleanup headers</td><td><code>'self'</code></td><td>Same-origin POST works; the cross-origin hand-back is still refused in Chromium</td></tr>
+      </table>
+    </div>
+    <p>The reading this supports: native sign-in with a cross-origin web client has never worked in a Chromium browser. Issues #504 and #505 addressed the redirect construction, one layer below the header that actually blocks it.</p>
+
+    <div class="evidence">
+      <strong>Reproduction transcript (2026-08-31, throwaway client <code>BO0Iz6WB…</code>):</strong>
+      <pre><code>GET  /_tuwunel/oidc/authorize?…            307  → /native?oidc_req_id=Vuhe3C6O…
+GET  /_tuwunel/oidc/native?oidc_req_id=…  200  form rendered
+GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   403  Invalid or expired login token
+GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   404  Unknown or expired authorization request</code></pre>
+      The two identical requests differ only in that the first one silently consumed the authorization request. That second line is the error the user reported.
+    </div>
+
+    <h3>Why the mobile clients were never affected</h3>
+    <p><code>needs_interstitial</code> in <code>src/api/oidc/complete.rs:82-85</code> serves a "Continue" page instead of a redirect for private-use schemes and for a native client's <code>https</code> universal link. The user then <em>clicks a link</em>, which starts a fresh navigation that <code>form-action</code> does not govern. So Element X on Android and iOS complete sign-in normally while Element Web on desktop cannot — a divergence worth remembering when triaging any future report of this shape.</p>
+
+    <h3>Rejected approaches</h3>
+    <div class="rejected">
+      <strong>Remove <code>form-action</code> from <code>TUWUNEL_CSP</code>.</strong> Fixes the symptom in one line but relaxes the policy on every HTML response the server emits, including admin and media surfaces, to solve a problem that exists on exactly one page. Kept as a documented fallback, not the plan.
+    </div>
+    <div class="rejected">
+      <strong>Override the CSP at the ingress.</strong> Works without rebuilding and is listed as a stopgap, but it moves a security-relevant application header into cluster configuration where the next person reading <code>layers.rs</code> will not see it, and it depends on snippet annotations being enabled cluster-wide.
+    </div>
+    <div class="rejected">
+      <strong>Force the interstitial for every client.</strong> Sidesteps the CSP correctly but taxes every web sign-in with an extra click, permanently, to route around a header we own.
+    </div>
+    <div class="rejected">
+      <strong>Make <code>_complete</code> idempotent by retaining the request until expiry.</strong> Tempting — it would make the retry work without touching the CSP — but it lets one authorization request mint multiple codes for ten minutes, weakening the single-use property the OAuth code flow depends on. Phase 2's peek → validate → consume gets the recoverability without that cost.
+    </div>
+
+    <h3>Loose threads worth a separate look</h3>
+    <ul>
+      <li>Element re-registers a dynamic client on <em>every</em> attempt (six <code>POST /registration</code> in five minutes, all returning the same deterministic <code>client_id</code>). Harmless, but it makes the logs noisy and is worth understanding.</li>
+      <li>Login tokens are single-use — <code>find_from_login_token</code> removes the row on read (<code>src/service/users/mod.rs:536-558</code>) — so a retry always needs a fresh form submission. That is correct, and it is why Phase 2 restores the <em>request</em> rather than the token.</li>
+      <li>The same logs show constant appservice failures (<code>mautrix-discord</code> 404s, <code>mautrix-whatsapp</code> connection refused). Unrelated to login, but they are burying real signal in the pod logs.</li>
+      <li><code>authorize_route</code> and <code>complete_route</code> are the only two browser-navigation routes that still return <code>Result</code> and therefore JSON; Phase 3 fixes both, and a lint or review note would keep new ones from appearing.</li>
+    </ul>
+
+    <figure>
+      <svg viewBox="0 0 920 150" role="img" aria-label="Which client shapes are affected">
+        <rect x="24" y="30" width="272" height="92" rx="10" fill="var(--surface)" stroke="var(--bad)" stroke-width="1.5"/>
+        <text x="160" y="60" text-anchor="middle" class="dlabel-strong" fill="var(--bad)">web client, other origin</text>
+        <text x="160" y="82" text-anchor="middle" class="dlabel">307 redirect</text>
+        <text x="160" y="104" text-anchor="middle" class="dlabel" fill="var(--bad)">blocked</text>
+
+        <rect x="324" y="30" width="272" height="92" rx="10" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.5"/>
+        <text x="460" y="60" text-anchor="middle" class="dlabel-strong" fill="var(--ok)">app scheme &#183; universal link</text>
+        <text x="460" y="82" text-anchor="middle" class="dlabel">interstitial, user clicks</text>
+        <text x="460" y="104" text-anchor="middle" class="dlabel" fill="var(--ok)">works</text>
+
+        <rect x="624" y="30" width="272" height="92" rx="10" fill="var(--surface)" stroke="var(--ok)" stroke-width="1.5"/>
+        <text x="760" y="60" text-anchor="middle" class="dlabel-strong" fill="var(--ok)">device grant &#183; account</text>
+        <text x="760" y="82" text-anchor="middle" class="dlabel">same origin throughout</text>
+        <text x="760" y="104" text-anchor="middle" class="dlabel" fill="var(--ok)">works</text>
+      </svg>
+      <figcaption>Only the plain web client is affected — which is why the failure looked deployment-specific rather than like a server bug.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== AMENDMENTS ===== -->
+  <section id="amendments">
+    <h2>Amendments</h2>
+    <details open>
+      <summary>2026-08-31 — Phase 0 used a credential-free deterministic browser harness</summary>
+      <p>The execution environment had Chrome and Firefox but no production Matrix account credentials, and the connected Playwright browser's packaged Chrome path required unavailable sudo access. Phase 0 therefore replayed the exact production CSP and redirect topology on two local origins using the installed Chrome plus Selenium-driven Firefox. This preserves the gate's purpose — eyewitnessing the browser-only event and distinguishing a Chromium CSP block from a callback failure — without handling user credentials. The live CSP header and historical ingress sequence were re-verified separately against <code>matrix.datadialect.cz</code>.</p>
+    </details>
+  </section>
+
+</main>
+</body>
+</html>
