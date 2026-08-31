@@ -13,6 +13,7 @@ use http::{
 	header::{CONTENT_SECURITY_POLICY, CONTENT_TYPE, LOCATION},
 };
 use http_body_util::BodyExt;
+use tokio::sync::Barrier;
 use tower::ServiceExt;
 use tuwunel::{Args, Runtime, Server};
 use tuwunel_core::{Err, Error, Result, ruma::UserId};
@@ -73,6 +74,7 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 
 	let auth_request = test_auth_request();
 	assert_auth_request_storage(services, &auth_request).await?;
+	assert_concurrent_auth_request_take(services, &auth_request).await?;
 	assert_native_pages(services, &auth_request).await?;
 
 	let user_id = UserId::parse_with_server_name("nativealice", services.globals.server_name())?;
@@ -100,6 +102,51 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 
 	if resolved != user_id {
 		return Err!("login token resolved to the wrong user: {resolved}");
+	}
+
+	Ok(())
+}
+
+async fn assert_concurrent_auth_request_take(
+	services: &Arc<Services>,
+	auth_request: &AuthRequest,
+) -> Result {
+	const CONTENDERS: usize = 32;
+
+	let oidc = services.oauth.get_server()?;
+	// Widen the interval between the database read and remove enough for every
+	// contender to observe the same value on a multi-threaded runtime.
+	let mut large_auth_request = auth_request.clone();
+	large_auth_request.redirect_uri = format!("https://element.example/{}", "x".repeat(4 << 20));
+	oidc.store_auth_request("native-concurrent-take", &large_auth_request);
+
+	let barrier = Arc::new(Barrier::new(CONTENDERS));
+	let mut tasks = Vec::with_capacity(CONTENDERS);
+	for _ in 0..CONTENDERS {
+		let services = services.clone();
+		let barrier = barrier.clone();
+		tasks.push(tokio::spawn(async move {
+			barrier.wait().await;
+			services
+				.oauth
+				.get_server()
+				.expect("OIDC server must remain available")
+				.take_auth_request("native-concurrent-take")
+				.await
+				.is_ok()
+		}));
+	}
+
+	let mut successes: usize = 0;
+	for task in tasks {
+		let succeeded = task
+			.await
+			.expect("concurrent take task must not panic");
+		successes = successes.saturating_add(usize::from(succeeded));
+	}
+
+	if successes != 1 {
+		return Err!("authorization request was taken {successes} times concurrently");
 	}
 
 	Ok(())

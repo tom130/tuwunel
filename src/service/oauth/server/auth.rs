@@ -121,6 +121,7 @@ pub async fn peek_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
 
 #[implement(super::Server)]
 pub async fn take_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
+	let _request_lock = self.auth_request_locks.lock(req_id).await;
 	let request = self.peek_auth_request(req_id).await?;
 
 	self.db.oidcreqid_authrequest.remove(req_id);

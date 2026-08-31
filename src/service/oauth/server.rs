@@ -35,6 +35,10 @@ pub struct Server {
 	/// Serializes the read-check-consume of a device grant by its `device_code`
 	/// so concurrent polls of one approved grant cannot each mint a device.
 	device_locks: MutexMap<String, ()>,
+
+	/// Serializes authorization-request consumption by request ID so concurrent
+	/// completions cannot each mint an authorization code.
+	auth_request_locks: MutexMap<String, ()>,
 }
 
 struct Data {
@@ -73,6 +77,7 @@ impl Server {
 			jwk: init_jwk(&key.key_der, &key.key_id)?,
 			key,
 			device_locks: MutexMap::new(),
+			auth_request_locks: MutexMap::new(),
 		}))
 	}
 }
