@@ -537,7 +537,7 @@ fn render_login(context: Flow<'_>, error: Option<&str>, show_register: bool) -> 
 			let register_link = show_register
 				.then(|| {
 					format!(
-						r#"<p class="nav">No account? <a href="/_tuwunel/oidc/native?oidc_req_id={}&amp;view=register">Create one</a>.</p>"#,
+						r#"<p class="auth-nav">New to this homeserver? <a href="/_tuwunel/oidc/native?oidc_req_id={}&amp;view=register">Create an account</a></p>"#,
 						url_encode(req_id),
 					)
 				})
@@ -573,7 +573,12 @@ async fn render_register(services: &Services, req_id: &str, error: Option<&str>)
 
 fn error_block(error: Option<&str>) -> String {
 	error
-		.map(|msg| format!(r#"<p class="err">{}</p>"#, html_escape(msg)))
+		.map(|msg| {
+			format!(
+				r#"<div class="auth-alert err" role="alert"><span aria-hidden="true">!</span><p>{}</p></div>"#,
+				html_escape(msg),
+			)
+		})
 		.unwrap_or_default()
 }
 
@@ -614,25 +619,64 @@ static LOGIN_HTML: &str = const_format!(
 <html lang="en">
 	<head>
 		{ACCOUNT_HEAD}
-		<title>Sign In</title>
+		<title>Sign in · tuwunel</title>
 	</head>
-	<body>
-		<h1>Sign In</h1>
-		{{error}}
-		<form method="POST" action="/_tuwunel/oidc/native">
-			{{context_fields}}
-			<input type="hidden" name="mode" value="login">
-			<label>
-				Username
-				<input type="text" name="username" autocomplete="username" autofocus required>
-			</label>
-			<label>
-				Password
-				<input type="password" name="password" autocomplete="current-password" required>
-			</label>
-			<button type="submit">Sign in</button>
-		</form>
-		{{register_link}}
+	<body class="auth-page">
+		<main class="auth-shell">
+			<section class="auth-card" aria-labelledby="auth-title">
+				<header class="auth-header">
+					<p class="auth-brand">
+						<span class="auth-brand-mark" aria-hidden="true"></span>
+						<span>tuwunel</span>
+					</p>
+					<p class="auth-kicker">Matrix identity portal</p>
+					<h1 id="auth-title">Sign in</h1>
+					<p class="auth-intro">Use your homeserver credentials to continue securely.</p>
+				</header>
+				{{error}}
+				<form class="auth-form" method="POST" action="/_tuwunel/oidc/native">
+					{{context_fields}}
+					<input type="hidden" name="mode" value="login">
+					<label class="auth-field">
+						<span class="auth-field-label">Username</span>
+						<input type="text" name="username" autocomplete="username" autofocus required>
+					</label>
+					<label class="auth-field">
+						<span class="auth-field-label">Password</span>
+						<input type="password" name="password" autocomplete="current-password" required>
+					</label>
+					<button class="auth-submit" type="submit">
+						<span>Continue</span>
+						<span class="auth-submit-arrow" aria-hidden="true">→</span>
+					</button>
+				</form>
+				{{register_link}}
+			</section>
+			<aside class="auth-aside" aria-label="About Matrix authentication">
+				<div class="auth-aside-meta">
+					<span>Federated access</span>
+					<span>01</span>
+				</div>
+				<div class="auth-signal" aria-hidden="true">
+					<span class="auth-signal-ring"></span>
+					<span class="auth-signal-core"></span>
+				</div>
+				<div class="auth-aside-copy">
+					<p class="auth-aside-kicker">Built on Matrix</p>
+					<h2>One identity.<br>Every room.</h2>
+					<p>Your account remains anchored to your homeserver while you connect across the open network.</p>
+				</div>
+				<ul class="auth-tags" aria-label="Matrix qualities">
+					<li>Open</li>
+					<li>Federated</li>
+					<li>Private</li>
+				</ul>
+			</aside>
+		</main>
+		<footer class="auth-footer">
+			<span class="auth-status" aria-hidden="true"></span>
+			Native authentication · tuwunel
+		</footer>
 	</body>
 </html>"#
 );
@@ -643,33 +687,72 @@ static REGISTER_HTML: &str = const_format!(
 <html lang="en">
 	<head>
 		{ACCOUNT_HEAD}
-		<title>Create Account</title>
+		<title>Create account · tuwunel</title>
 	</head>
-	<body>
-		<h1>Create Account</h1>
-		{{error}}
-		<form method="POST" action="/_tuwunel/oidc/native">
-			<input type="hidden" name="oidc_req_id" value="{{req_id}}">
-			<input type="hidden" name="mode" value="register">
-			<label>
-				Username
-				<input type="text" name="username" autocomplete="username" autofocus required>
-			</label>
-			<label>
-				Password
-				<input type="password" name="password" autocomplete="new-password" required>
-			</label>
-			{{token_field}}
-			{{terms}}
-			<button type="submit">Create account</button>
-		</form>
-		<p class="nav">Have an account? <a href="/_tuwunel/oidc/native?oidc_req_id={{req_id_enc}}&amp;view=login">Sign in</a>.</p>
+	<body class="auth-page">
+		<main class="auth-shell">
+			<section class="auth-card" aria-labelledby="auth-title">
+				<header class="auth-header">
+					<p class="auth-brand">
+						<span class="auth-brand-mark" aria-hidden="true"></span>
+						<span>tuwunel</span>
+					</p>
+					<p class="auth-kicker">Matrix identity portal</p>
+					<h1 id="auth-title">Create account</h1>
+					<p class="auth-intro">Choose the credentials for your new home on Matrix.</p>
+				</header>
+				{{error}}
+				<form class="auth-form" method="POST" action="/_tuwunel/oidc/native">
+					<input type="hidden" name="oidc_req_id" value="{{req_id}}">
+					<input type="hidden" name="mode" value="register">
+					<label class="auth-field">
+						<span class="auth-field-label">Username</span>
+						<input type="text" name="username" autocomplete="username" autofocus required>
+					</label>
+					<label class="auth-field">
+						<span class="auth-field-label">Password</span>
+						<input type="password" name="password" autocomplete="new-password" required>
+					</label>
+					{{token_field}}
+					{{terms}}
+					<button class="auth-submit" type="submit">
+						<span>Create account</span>
+						<span class="auth-submit-arrow" aria-hidden="true">→</span>
+					</button>
+				</form>
+				<p class="auth-nav">Already have an account? <a href="/_tuwunel/oidc/native?oidc_req_id={{req_id_enc}}&amp;view=login">Sign in</a></p>
+			</section>
+			<aside class="auth-aside" aria-label="About Matrix authentication">
+				<div class="auth-aside-meta">
+					<span>Federated access</span>
+					<span>02</span>
+				</div>
+				<div class="auth-signal" aria-hidden="true">
+					<span class="auth-signal-ring"></span>
+					<span class="auth-signal-core"></span>
+				</div>
+				<div class="auth-aside-copy">
+					<p class="auth-aside-kicker">Your digital home</p>
+					<h2>Local roots.<br>Open reach.</h2>
+					<p>Create one homeserver identity and use it to communicate across the federated Matrix network.</p>
+				</div>
+				<ul class="auth-tags" aria-label="Matrix qualities">
+					<li>Open</li>
+					<li>Federated</li>
+					<li>Private</li>
+				</ul>
+			</aside>
+		</main>
+		<footer class="auth-footer">
+			<span class="auth-status" aria-hidden="true"></span>
+			Native authentication · tuwunel
+		</footer>
 	</body>
 </html>"#
 );
 
-static TOKEN_FIELD: &str = r#"<label>
-				Registration token
+static TOKEN_FIELD: &str = r#"<label class="auth-field">
+				<span class="auth-field-label">Registration token</span>
 				<input type="text" name="registration_token" autocomplete="off" required>
 			</label>"#;
 
@@ -680,8 +763,9 @@ mod tests {
 	use tuwunel_core::{err, utils::html::TUWUNEL_CSP_VALUE};
 
 	use super::{
-		Flow, error_block, expired_authorization_page, expired_authorization_response,
-		form_action_source, native_html_response, parse_flow, render_login,
+		Flow, REGISTER_HTML, error_block, expired_authorization_page,
+		expired_authorization_response, form_action_source, native_html_response, parse_flow,
+		render_login,
 	};
 
 	#[test]
@@ -760,6 +844,24 @@ mod tests {
 		assert!(html.contains(r#"name="username""#));
 		assert!(html.contains(r#"name="password""#));
 		assert!(!html.contains("view=register"));
+	}
+
+	#[test]
+	fn native_auth_pages_share_the_accessible_auth_layout() {
+		let login = render_login(Flow::Authorization("REQ123"), None, false);
+
+		for html in [login.as_str(), REGISTER_HTML] {
+			assert!(html.contains(r#"<body class="auth-page">"#));
+			assert!(html.contains(r#"<main class="auth-shell">"#));
+			assert!(html.contains(r#"<section class="auth-card" aria-labelledby="auth-title">"#));
+			assert!(html.contains(r#"<header class="auth-header">"#));
+			assert!(html.contains(r#"<p class="auth-brand">"#));
+			assert!(html.contains(r#"<h1 id="auth-title">"#));
+			assert!(html.contains(r#"<form class="auth-form""#));
+			assert!(html.contains(r#"<button class="auth-submit""#));
+			assert!(html.contains(r#"<aside class="auth-aside""#));
+			assert!(html.contains(r#"<footer class="auth-footer">"#));
+		}
 	}
 
 	#[test]
@@ -902,8 +1004,11 @@ mod tests {
 	}
 
 	#[test]
-	fn error_block_renders_only_when_present() {
+	fn error_block_renders_accessible_alert_only_when_present() {
 		assert!(error_block(None).is_empty());
-		assert!(error_block(Some("oops")).contains(r#"class="err""#));
+
+		let html = error_block(Some("oops"));
+		assert!(html.contains(r#"class="auth-alert err" role="alert""#));
+		assert!(html.contains("<p>oops</p>"));
 	}
 }

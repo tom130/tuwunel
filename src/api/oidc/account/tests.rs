@@ -2,9 +2,27 @@ use http::{StatusCode, header::CONTENT_SECURITY_POLICY};
 use tuwunel_core::utils::html::TUWUNEL_CSP_VALUE;
 
 use super::{
-	ACCOUNT_MANAGEMENT_ACTIONS_SUPPORTED, account_html_response_with_form_action,
-	browser_error_page, normalize_account_action, redirect_origin,
+	ACCOUNT_CSS, ACCOUNT_HEAD, ACCOUNT_MANAGEMENT_ACTIONS_SUPPORTED,
+	account_html_response_with_form_action, browser_error_page, normalize_account_action,
+	redirect_origin,
 };
+
+#[test]
+fn shared_assets_define_responsive_native_auth_theme() {
+	assert!(ACCOUNT_HEAD.contains(r#"name="viewport""#));
+
+	for rule in [
+		"body.auth-page",
+		".auth-card",
+		".auth-form input[type=\"password\"]",
+		".auth-form input:focus-visible",
+		".auth-submit:focus-visible",
+		"@media (max-width: 760px)",
+		"@media (prefers-reduced-motion: reduce)",
+	] {
+		assert!(ACCOUNT_CSS.contains(rule), "missing auth theme rule: {rule}");
+	}
+}
 
 #[test]
 fn authorization_csp_only_widens_form_action() {
