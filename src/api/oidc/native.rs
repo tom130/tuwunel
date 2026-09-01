@@ -70,12 +70,19 @@ enum Flow<'a> {
 	Device(&'a str),
 }
 
+/// Converts a validated native callback into a CSP `form-action` source.
+///
+/// Unlike `redirect_origin` in the account module, this permits dotted
+/// private-use schemes because the form posts to a validated native-app
+/// callback; a clickable "Start over" link must remain HTTP(S)-only.
 fn form_action_source(redirect_uri: &str) -> Option<String> {
 	let url = Url::parse(redirect_uri).ok()?;
 	let source = match url.scheme() {
 		| "http" | "https" => url.origin().ascii_serialization(),
-		| "javascript" | "data" => return None,
-		| scheme => format!("{scheme}:"),
+		// Mirror DCR's redirect classification (`validate_redirect_uri`): only
+		// dotted reverse-DNS private-use schemes qualify as a CSP source.
+		| scheme if scheme.contains('.') => format!("{scheme}:"),
+		| _ => return None,
 	};
 
 	(source != "null" && !source.contains([' ', '\t', '\r', '\n', ';', ','])).then_some(source)
@@ -114,6 +121,10 @@ fn native_html_response(
 
 /// Renders the native login or registration page bound to a pending
 /// authorization request.
+///
+/// This is a browser navigation target: it deliberately returns `Response`
+/// and renders every failure as HTML. Do not change it to a `Result`-returning
+/// route, which would regress failures to JSON responses.
 pub(crate) async fn native_get_route(
 	State(services): State<crate::State>,
 	request: Request,
@@ -173,6 +184,10 @@ fn parse_flow<'a>(
 
 /// Authenticates submitted credentials and sends the login token to the
 /// authorization completion, device-consent, or account-management callback.
+///
+/// This is a browser navigation target: it deliberately returns `Response`
+/// and renders every failure as HTML. Do not change it to a `Result`-returning
+/// route, which would regress failures to JSON responses.
 pub(crate) async fn native_submit_route(
 	State(services): State<crate::State>,
 	ClientIp(client): ClientIp,
@@ -209,11 +224,15 @@ pub(crate) async fn native_submit_route(
 }
 
 fn expired_authorization_response(error: &Error) -> Response {
-	account_html_response_with_form_action(
-		error.status_code(),
-		expired_authorization_page(),
-		None,
-	)
+	match error {
+		| Error::Request(ruma::api::error::ErrorKind::NotFound, ..) =>
+			account_html_response_with_form_action(
+				error.status_code(),
+				expired_authorization_page(),
+				None,
+			),
+		| _ => account_error_response(error),
+	}
 }
 
 fn expired_authorization_page() -> String {
@@ -656,12 +675,13 @@ static TOKEN_FIELD: &str = r#"<label>
 
 #[cfg(test)]
 mod tests {
+	use axum::body::to_bytes;
 	use http::{StatusCode, header::CONTENT_SECURITY_POLICY};
-	use tuwunel_core::utils::html::TUWUNEL_CSP_VALUE;
+	use tuwunel_core::{err, utils::html::TUWUNEL_CSP_VALUE};
 
 	use super::{
-		Flow, error_block, expired_authorization_page, form_action_source, native_html_response,
-		parse_flow, render_login,
+		Flow, error_block, expired_authorization_page, expired_authorization_response,
+		form_action_source, native_html_response, parse_flow, render_login,
 	};
 
 	#[test]
@@ -695,6 +715,8 @@ mod tests {
 		);
 		assert_eq!(form_action_source("javascript:alert(1)"), None);
 		assert_eq!(form_action_source("data:text/html,x"), None);
+		assert_eq!(form_action_source("blob:https://element.example/id"), None);
+		assert_eq!(form_action_source("file:///etc/passwd"), None);
 		assert_eq!(form_action_source("not a URI"), None);
 		assert_eq!(form_action_source("https://a; script-src *"), None);
 	}
@@ -706,6 +728,27 @@ mod tests {
 		assert!(html.contains("This sign-in link has expired"));
 		assert!(html.contains("Return to your app and start sign-in again"));
 		assert!(!html.contains("<form"));
+	}
+
+	#[tokio::test]
+	async fn expired_authorization_copy_is_only_for_not_found() {
+		let not_found = err!(Request(NotFound("Authorization request not found")));
+		let response = expired_authorization_response(&not_found);
+		let body = to_bytes(response.into_body(), usize::MAX)
+			.await
+			.expect("expired response body should be readable");
+		let body = String::from_utf8(body.to_vec()).expect("response body should be UTF-8");
+		assert!(body.contains("Sign-in link expired"));
+
+		let unrecognized = err!(Request(Unrecognized("OIDC server not configured")));
+		let expected_message = unrecognized.sanitized_message();
+		let response = expired_authorization_response(&unrecognized);
+		let body = to_bytes(response.into_body(), usize::MAX)
+			.await
+			.expect("error response body should be readable");
+		let body = String::from_utf8(body.to_vec()).expect("response body should be UTF-8");
+		assert!(body.contains(&expected_message));
+		assert!(!body.contains("Sign-in link expired"));
 	}
 
 	#[test]

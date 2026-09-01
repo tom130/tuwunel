@@ -21,6 +21,12 @@ pub(crate) struct CompleteParams {
 	login_token: String,
 }
 
+/// Completes native browser authorization and returns either a redirect or an
+/// HTML error page.
+///
+/// This is a browser navigation target: it deliberately returns `Response`
+/// and renders every failure as HTML. Do not change it to a `Result`-returning
+/// route, which would regress failures to JSON responses.
 pub(crate) async fn complete_route(
 	State(services): State<crate::State>,
 	request: axum::extract::Request,

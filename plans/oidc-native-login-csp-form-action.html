@@ -136,12 +136,12 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-08-31T20:15:00Z</dd>
-        <dt>modified</dt>     <dd>2026-09-01T00:45:41Z</dd>
+        <dt>modified</dt>     <dd>2026-09-01T09:39:43Z</dd>
         <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code>, <code>99b7a40b</code>, <code>6f07a2d4</code>, <code>1c46af69</code>, <code>83609e4b</code></dd>
         <dt>agent name</dt>   <dd>claude-opus-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>ce4a14e7-419f-4562-86b6-28371d1dfb71</dd>
         <dt>back refs</dt>    <dd>plans/archive/oauth-authorization-code-PLAN.md, plans/archive/msc4108-qr-login-PLAN.md, plans/deploy-config-1.8.2.md</dd>
-        <dt>forward refs</dt> <dd>—</dd>
+        <dt>forward refs</dt> <dd>plans/oidc-security-hardening-followups.html</dd>
       </dl>
     </details>
   </header>
@@ -654,6 +654,10 @@ GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   404  Unknown or expir
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-09-01 — Correct Phase 2/3 integration-test commands</summary>
+      <p>The retry and authorization-request storage behaviors described in the Phase 2 and Phase 3 testing checklists are exercised by the deterministic server integration fixture in <code>src/main/tests/native_auth.rs</code>. The authoritative command is <code>cargo test -p tuwunel --test native_auth</code>, not the historical <code>cargo test -p tuwunel_api complete</code> or <code>cargo test -p tuwunel_service oauth</code> filters. The follow-up hardening work and its regression gates are tracked in <code>plans/oidc-security-hardening-followups.html</code>.</p>
+    </details>
     <details open>
       <summary>2026-09-01 — Final digest deployed and verified in Chromium, Firefox, and WebKit</summary>
       <p>Fork CI run <code>33451800790</code> published commit <code>83609e4b</code> as <code>ghcr.io/tom130/tuwunel:oidc-native-login-csp-form-action@sha256:f06c48dec7e17d0ff65667ebe8208b629ce66dea32684808963106eaf97887f6</code>. GitOps commit <code>beaf095</code> reconciled that exact digest; Helm release v33 became Ready and the replacement pod reported 1/1 Ready. Headless Chrome 148 passed both a single-submit sign-in and a wrong-then-correct password retry with token and sync status 200 and zero CSP violations. Firefox 151 and Playwright WebKit 26.5 (the available Safari-engine substitute) each rendered a signed-in Element session; ingress recorded one <code>_complete</code> 307 and one token 200 for each. A fresh unconsumed request returned the scoped Element <code>form-action</code>, the account page retained <code>form-action 'self'</code>, and two bogus completion attempts both returned safe HTML 403 pages rather than consuming the request. The live log commands now specify <code>--tail=-1</code>, because <code>kubectl logs</code> defaults to ten lines per pod when a label selector is used. Because the fork workflow uses the raw ref name as an OCI tag and slash-containing branch names are invalid tags, publication used the equivalent slash-free branch ref; the feature branch itself remains <code>fix/oidc-native-login-csp-form-action</code>.</p>

@@ -23,7 +23,7 @@ use tuwunel_core::{
 	Err, Error, Result, err,
 	utils::{
 		BoolExt,
-		html::{TUWUNEL_CSP_VALUE, escape as html_escape},
+		html::{TUWUNEL_CSP, TUWUNEL_CSP_VALUE, escape as html_escape},
 	},
 };
 use tuwunel_service::Services;
@@ -394,8 +394,14 @@ pub(super) fn account_html_response_with_form_action(
 	let policy = extra_source.map_or_else(
 		|| TUWUNEL_CSP_VALUE.to_owned(),
 		|source| {
-			TUWUNEL_CSP_VALUE
-				.replace("form-action 'self'", &format!("form-action 'self' {source}"))
+			TUWUNEL_CSP
+				.iter()
+				.map(|directive| match directive.strip_prefix("form-action") {
+					| Some(rest) => format!("form-action{rest} {source}"),
+					| None => (*directive).to_owned(),
+				})
+				.collect::<Vec<_>>()
+				.join(";")
 		},
 	);
 	let policy = HeaderValue::try_from(policy)
@@ -427,6 +433,11 @@ pub(super) fn browser_error_response(error: &Error, start_over_origin: Option<&s
 	account_html_response(code, browser_error_page(&msg, start_over_origin))
 }
 
+/// Extracts the HTTP(S) origin for a clickable browser "Start over" link.
+///
+/// Unlike `form_action_source` in the native module, this rejects custom app
+/// schemes: browser links must remain web origins, while a validated native
+/// callback may be admitted as a CSP form target.
 pub(super) fn redirect_origin(redirect_uri: &str) -> Option<String> {
 	let url = Url::parse(redirect_uri).ok()?;
 	if !matches!(url.scheme(), "http" | "https") {

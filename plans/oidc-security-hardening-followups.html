@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-09-01T08:37:48Z</dd>
-        <dt>modified</dt>     <dd>2026-09-01T09:32:17Z</dd>
-        <dt>commits</dt>      <dd><code>09429045</code>, <code>5437a0dd</code></dd>
+        <dt>modified</dt>     <dd>2026-09-01T09:45:24Z</dd>
+        <dt>commits</dt>      <dd><code>09429045</code>, <code>5437a0dd</code>, <code>37afceb8</code></dd>
         <dt>agent name</dt>   <dd>claude-fable-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>884be352-da0f-4650-85f3-173e85a8239e</dd>
         <dt>back refs</dt>    <dd>plans/oidc-native-login-csp-form-action.html</dd>
@@ -354,12 +354,12 @@ async fn html_layer_preserves_handler_csp() {
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 4: Hardening polish in the touched modules</h3>
+      <h3><code class="status">[x]</code> Phase 4: Hardening polish in the touched modules</h3>
       <p>The review's cheap minors that materially harden or de-fragilize the same files: allowlist scheme classification, structural CSP construction, honest error copy, and the divergence documentation. Closes review minors 1-5.</p>
 
       <h4>1. Flip <code>form_action_source</code> to an allowlist</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>src/api/oidc/native.rs:73-82</code>, replace the <code>javascript</code>/<code>data</code> denylist with the DCR-mirroring classification — http/https origins, or dotted reverse-DNS private-use schemes (<code>is_reverse_dns</code> with no base is <code>scheme.contains('.')</code>, <code>registration.rs:218-221</code>); everything else (<code>blob:</code>, <code>file:</code>, <code>ftp:</code>…) yields <code>None</code> and falls back to the strict policy:</li>
+        <li><code class="status">[x]</code> In <code>src/api/oidc/native.rs:73-82</code>, replace the <code>javascript</code>/<code>data</code> denylist with the DCR-mirroring classification — http/https origins, or dotted reverse-DNS private-use schemes (<code>is_reverse_dns</code> with no base is <code>scheme.contains('.')</code>, <code>registration.rs:218-221</code>); everything else (<code>blob:</code>, <code>file:</code>, <code>ftp:</code>…) yields <code>None</code> and falls back to the strict policy:</li>
       </ul>
       <pre><code>let source = match url.scheme() {
 	| "http" | "https" =&gt; url.origin().ascii_serialization(),
@@ -369,12 +369,12 @@ async fn html_layer_preserves_handler_csp() {
 	| _ =&gt; return None,
 };</code></pre>
       <ul class="checklist">
-        <li><code class="status">[]</code> Extend <code>form_action_accepts_safe_origins_and_rejects_header_injection</code> (<code>native.rs:687-700</code>) with <code>blob:</code> and <code>file:///etc/passwd</code> → <code>None</code>; keep <code>io.element.android:</code> → <code>Some</code>.</li>
+        <li><code class="status">[x]</code> Extend <code>form_action_accepts_safe_origins_and_rejects_header_injection</code> (<code>native.rs:687-700</code>) with <code>blob:</code> and <code>file:///etc/passwd</code> → <code>None</code>; keep <code>io.element.android:</code> → <code>Some</code>.</li>
       </ul>
 
       <h4>2. Build the widened policy from the <code>TUWUNEL_CSP</code> parts</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>account_html_response_with_form_action</code> (<code>account.rs:394-400</code>), replace the silent string-replace with a map over <code>TUWUNEL_CSP</code> so a reworded or reordered policy can never silently drop the widening; keep the <code>HeaderValue::try_from</code> fail-closed fallback (401-402) unchanged:</li>
+        <li><code class="status">[x]</code> In <code>account_html_response_with_form_action</code> (<code>account.rs:394-400</code>), replace the silent string-replace with a map over <code>TUWUNEL_CSP</code> so a reworded or reordered policy can never silently drop the widening; keep the <code>HeaderValue::try_from</code> fail-closed fallback (401-402) unchanged:</li>
       </ul>
       <pre><code>let policy = extra_source.map_or_else(
 	|| TUWUNEL_CSP_VALUE.to_owned(),
@@ -390,32 +390,32 @@ async fn html_layer_preserves_handler_csp() {
 	},
 );</code></pre>
       <ul class="checklist">
-        <li><code class="status">[]</code> The existing exact-header tests (<code>account/tests.rs</code> <code>authorization_csp_only_widens_form_action</code>, plus both integration CSP assertions) must pass byte-for-byte unchanged — they are the proof the construction is equivalent.</li>
+        <li><code class="status">[x]</code> The existing exact-header tests (<code>account/tests.rs</code> <code>authorization_csp_only_widens_form_action</code>, plus both integration CSP assertions) must pass byte-for-byte unchanged — they are the proof the construction is equivalent.</li>
       </ul>
 
       <h4>3. Gate the "link expired" copy on an actual <code>NotFound</code></h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>expired_authorization_response</code> (<code>native.rs:211-217</code>): both real peek failures are <code>Request(NotFound(…))</code>, while a missing OIDC server surfaces as <code>Request(Unrecognized(…))</code> (<code>oauth/mod.rs:77-81</code>). Render the expired page only for the <code>NotFound</code> kind; delegate everything else to <code>account_error_response(error)</code>, which already shows the sanitized message. Verify the exact <code>Error::Request</code> variant shape against <code>tuwunel_core::Error</code> when implementing (the integration suite matches it as <code>Error::Request(_, message, _)</code>).</li>
-        <li><code class="status">[]</code> Add a unit test: a <code>NotFound</code> error renders the expired page; an <code>Unrecognized</code> error renders its sanitized message and not the "Sign-in link expired" heading.</li>
+        <li><code class="status">[x]</code> In <code>expired_authorization_response</code> (<code>native.rs:211-217</code>): both real peek failures are <code>Request(NotFound(…))</code>, while a missing OIDC server surfaces as <code>Request(Unrecognized(…))</code> (<code>oauth/mod.rs:77-81</code>). Render the expired page only for the <code>NotFound</code> kind; delegate everything else to <code>account_error_response(error)</code>, which already shows the sanitized message. Verify the exact <code>Error::Request</code> variant shape against <code>tuwunel_core::Error</code> when implementing (the integration suite matches it as <code>Error::Request(_, message, _)</code>).</li>
+        <li><code class="status">[x]</code> Add a unit test: a <code>NotFound</code> error renders the expired page; an <code>Unrecognized</code> error renders its sanitized message and not the "Sign-in link expired" heading.</li>
       </ul>
 
       <h4>4. Document the deliberate divergences</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Doc comments on <code>form_action_source</code> (<code>native.rs</code>) and <code>redirect_origin</code> (<code>account.rs:430-442</code>) naming each other and stating why they differ: link target (http/https only — a clickable "Start over" must never be a custom scheme) vs CSP source (custom app schemes allowed — the form posts to a validated native callback).</li>
-        <li><code class="status">[]</code> Doc comments on <code>native_get_route</code>, <code>native_submit_route</code> (<code>native.rs</code>) and <code>complete_route</code> (<code>complete.rs</code>): browser navigation targets return <code>Response</code> and render every failure as HTML — never add a <code>Result</code>-returning route here, or errors regress to JSON (the parent plan's recorded loose thread).</li>
+        <li><code class="status">[x]</code> Doc comments on <code>form_action_source</code> (<code>native.rs</code>) and <code>redirect_origin</code> (<code>account.rs:430-442</code>) naming each other and stating why they differ: link target (http/https only — a clickable "Start over" must never be a custom scheme) vs CSP source (custom app schemes allowed — the form posts to a validated native callback).</li>
+        <li><code class="status">[x]</code> Doc comments on <code>native_get_route</code>, <code>native_submit_route</code> (<code>native.rs</code>) and <code>complete_route</code> (<code>complete.rs</code>): browser navigation targets return <code>Response</code> and render every failure as HTML — never add a <code>Result</code>-returning route here, or errors regress to JSON (the parent plan's recorded loose thread).</li>
       </ul>
 
       <h4>5. Amend the parent plan</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Append an amendment entry to <code>plans/oidc-native-login-csp-form-action.html</code> correcting its phase-2/3 testing checklists: the retry/storage behaviors are tested by <code>cargo test -p tuwunel --test native_auth</code> (in <code>src/main/tests/native_auth.rs</code>), not <code>-p tuwunel_api complete</code> / <code>-p tuwunel_service oauth</code>. Append this plan to its <code>forward refs</code> metadata list (append-only; keep existing entries).</li>
+        <li><code class="status">[x]</code> Append an amendment entry to <code>plans/oidc-native-login-csp-form-action.html</code> correcting its phase-2/3 testing checklists: the retry/storage behaviors are tested by <code>cargo test -p tuwunel --test native_auth</code> (in <code>src/main/tests/native_auth.rs</code>), not <code>-p tuwunel_api complete</code> / <code>-p tuwunel_service oauth</code>. Append this plan to its <code>forward refs</code> metadata list (append-only; keep existing entries).</li>
       </ul>
 
       <h4>6. Testing Strategy</h4>
       <p>Unit tests in the touched crates carry this phase; the byte-for-byte CSP assertions at both the unit and integration layers prove the parts-based construction changed nothing observable. Run the full trio to catch cross-crate drift.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — allowlist, policy-construction, and error-copy tests pass; every pre-existing CSP byte-string unchanged.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel --test native_auth</code> — integration CSP assertions still byte-identical.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_router</code> — layer tests still green.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api oidc</code> — allowlist, policy-construction, and error-copy tests pass; every pre-existing CSP byte-string unchanged.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel --test native_auth</code> — integration CSP assertions still byte-identical.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_router</code> — layer tests still green.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
