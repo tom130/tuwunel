@@ -141,6 +141,7 @@ pub async fn exchange_auth_code(
 	code_verifier: Option<&str>,
 	require_pkce: bool,
 ) -> Result<AuthCodeSession> {
+	let _code_lock = self.auth_code_locks.lock(code).await;
 	let session: AuthCodeSession = self
 		.db
 		.oidccode_authsession

@@ -75,6 +75,7 @@ async fn native_round_trip(services: &Arc<Services>) -> Result {
 	let auth_request = test_auth_request();
 	assert_auth_request_storage(services, &auth_request).await?;
 	assert_concurrent_auth_request_take(services, &auth_request).await?;
+	assert_concurrent_auth_code_exchange(services, &auth_request).await?;
 	assert_native_pages(services, &auth_request).await?;
 
 	let user_id = UserId::parse_with_server_name("nativealice", services.globals.server_name())?;
@@ -147,6 +148,54 @@ async fn assert_concurrent_auth_request_take(
 
 	if successes != 1 {
 		return Err!("authorization request was taken {successes} times concurrently");
+	}
+
+	Ok(())
+}
+
+async fn assert_concurrent_auth_code_exchange(
+	services: &Arc<Services>,
+	auth_request: &AuthRequest,
+) -> Result {
+	const CONTENDERS: usize = 32;
+
+	let oidc = services.oauth.get_server()?;
+	let mut large_auth_request = auth_request.clone();
+	large_auth_request.redirect_uri = format!("https://element.example/{}", "x".repeat(4 << 20));
+	let redirect_uri = large_auth_request.redirect_uri.clone();
+	let user_id =
+		UserId::parse_with_server_name("native-code-exchange", services.globals.server_name())?;
+	let code = oidc.create_auth_code(&large_auth_request, user_id);
+
+	let barrier = Arc::new(Barrier::new(CONTENDERS));
+	let mut tasks = Vec::with_capacity(CONTENDERS);
+	for _ in 0..CONTENDERS {
+		let services = services.clone();
+		let barrier = barrier.clone();
+		let code = code.clone();
+		let redirect_uri = redirect_uri.clone();
+		tasks.push(tokio::spawn(async move {
+			barrier.wait().await;
+			services
+				.oauth
+				.get_server()
+				.expect("OIDC server must remain available")
+				.exchange_auth_code(&code, "native-test-client", &redirect_uri, None, false)
+				.await
+				.is_ok()
+		}));
+	}
+
+	let mut successes: usize = 0;
+	for task in tasks {
+		let succeeded = task
+			.await
+			.expect("concurrent exchange task must not panic");
+		successes = successes.saturating_add(usize::from(succeeded));
+	}
+
+	if successes != 1 {
+		return Err!("authorization code was exchanged {successes} times concurrently");
 	}
 
 	Ok(())

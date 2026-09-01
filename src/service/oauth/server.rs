@@ -39,6 +39,11 @@ pub struct Server {
 	/// Serializes authorization-request consumption by request ID so concurrent
 	/// completions cannot each mint an authorization code.
 	auth_request_locks: MutexMap<String, ()>,
+
+	/// Serializes the read-check-consume of an authorization code so concurrent
+	/// token requests cannot each redeem the same single-use code (RFC 6749
+	/// §4.1.2).
+	auth_code_locks: MutexMap<String, ()>,
 }
 
 struct Data {
@@ -78,6 +83,7 @@ impl Server {
 			key,
 			device_locks: MutexMap::new(),
 			auth_request_locks: MutexMap::new(),
+			auth_code_locks: MutexMap::new(),
 		}))
 	}
 }
