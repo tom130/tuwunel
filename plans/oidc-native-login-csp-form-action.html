@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-08-31T20:15:00Z</dd>
-        <dt>modified</dt>     <dd>2026-08-31T22:00:17Z</dd>
-        <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code>, <code>99b7a40b</code>, <code>6f07a2d4</code></dd>
+        <dt>modified</dt>     <dd>2026-09-01T00:45:41Z</dd>
+        <dt>commits</dt>      <dd><code>1f27e308</code>, <code>cd8c04bf</code>, <code>99b7a40b</code>, <code>6f07a2d4</code>, <code>1c46af69</code>, <code>83609e4b</code></dd>
         <dt>agent name</dt>   <dd>claude-opus-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>ce4a14e7-419f-4562-86b6-28371d1dfb71</dd>
         <dt>back refs</dt>    <dd>plans/archive/oauth-authorization-code-PLAN.md, plans/archive/msc4108-qr-login-PLAN.md, plans/deploy-config-1.8.2.md</dd>
@@ -482,29 +482,29 @@ th { background: var(--code-bg); }
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 5: Ship it and verify against the live deployment</h3>
+      <h3><code class="status">[x]</code> Phase 5: Ship it and verify against the live deployment</h3>
       <p>The fix only counts when a real Chrome completes a real sign-in on <code>datadialect.cz</code>. Verification is a log assertion, not an impression: exactly one token exchange per sign-in.</p>
 
       <h4>1. Build and roll out</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Commit the change on a branch off <code>main</code> and push; let the fork CI build and publish <code>ghcr.io/tom130/tuwunel</code>.</li>
-        <li><code class="status">[]</code> Update the image digest in the <code>oci-flux</code> GitOps repo for <code>matrix-datadialect/tuwunel-datadialect</code> and let Flux reconcile.</li>
-        <li><code class="status">[]</code> <code>kubectl --context OCI -n matrix-datadialect rollout status deploy/tuwunel-datadialect</code> — the new pod is ready.</li>
+        <li><code class="status">[x]</code> Commit the change on a branch off <code>main</code> and push; let the fork CI build and publish <code>ghcr.io/tom130/tuwunel</code>.</li>
+        <li><code class="status">[x]</code> Update the image digest in the <code>oci-flux</code> GitOps repo for <code>matrix-datadialect/tuwunel-datadialect</code> and let Flux reconcile.</li>
+        <li><code class="status">[x]</code> <code>kubectl --context OCI -n matrix-datadialect rollout status deploy/tuwunel-datadialect</code> — the new pod is ready.</li>
       </ul>
 
       <h4>2. Verify end to end</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Confirm the served policy changed: the sign-in page's <code>form-action</code> now lists the Element origin, while <code>/_tuwunel/oidc/account</code> still shows <code>form-action 'self'</code>.</li>
-        <li><code class="status">[]</code> Sign in from Element Web in Chrome with a <strong>single</strong> submit and reach a synced session.</li>
-        <li><code class="status">[]</code> Deliberately mistype the password once, then sign in correctly on the same page — the second attempt must succeed, proving Phase 2.</li>
+        <li><code class="status">[x]</code> Confirm the served policy changed: the sign-in page's <code>form-action</code> now lists the Element origin, while <code>/_tuwunel/oidc/account</code> still shows <code>form-action 'self'</code>.</li>
+        <li><code class="status">[x]</code> Sign in from Element Web in Chrome with a <strong>single</strong> submit and reach a synced session.</li>
+        <li><code class="status">[x]</code> Deliberately mistype the password once, then sign in correctly on the same page — the second attempt must succeed, proving Phase 2.</li>
       </ul>
 
       <h4>3. Testing Strategy</h4>
       <p>Ingress access logs are the ground truth; they already recorded the failure precisely, so the same query proves the fix.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>kubectl --context OCI -n kube-system logs -l app.kubernetes.io/name=ingress-nginx --since=15m | grep -E "_tuwunel/oidc/(token|_complete)"</code> — shows one <code>_complete</code> <code>307</code> followed by one <code>POST /token 200</code>, and no <code>404</code>.</li>
-        <li><code class="status">[]</code> <code>kubectl --context OCI -n matrix-datadialect logs deploy/tuwunel-datadialect -c app --since=15m | grep -i oidc</code> — one client registration per sign-in, no repeated retry storm.</li>
-        <li><code class="status">[]</code> Repeat the sign-in in Firefox and Safari (or Element X against the same server) to confirm no regression on the paths that already worked.</li>
+        <li><code class="status">[x]</code> <code>kubectl --context OCI -n kube-system logs -l app.kubernetes.io/name=ingress-nginx --since=15m --tail=-1 | grep -E "_tuwunel/oidc/(token|_complete)"</code> — shows one <code>_complete</code> <code>307</code> followed by one <code>POST /token 200</code>, and no <code>404</code>.</li>
+        <li><code class="status">[x]</code> <code>kubectl --context OCI -n matrix-datadialect logs deploy/tuwunel-datadialect -c app --since=15m | grep -i oidc</code> — one client registration per sign-in, no repeated retry storm.</li>
+        <li><code class="status">[x]</code> Repeat the sign-in in Firefox and Playwright WebKit (the available Safari-engine substitute) to confirm no regression on the paths that already worked.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -518,13 +518,13 @@ th { background: var(--code-bg); }
     <h2>Validation Commands</h2>
     <p>Execute these commands to validate the entire plan is complete:</p>
     <ul class="checklist">
-      <li><code class="status">[]</code> <code>cargo test --workspace</code> — every unit and integration test passes, including the new CSP and retry coverage.</li>
-      <li><code class="status">[]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — no new lints from the added helpers.</li>
-      <li><code class="status">[]</code> <code>cargo fmt --all --check</code> — formatting matches CI.</li>
-      <li><code class="status">[]</code> <code>curl -sD- -o/dev/null "https://matrix.datadialect.cz/_tuwunel/oidc/native?oidc_req_id=$RID&amp;view=login" | grep -i content-security</code> — the live sign-in page advertises the widened <code>form-action</code> for a live <code>$RID</code>.</li>
-      <li><code class="status">[]</code> <code>curl -sD- -o/dev/null "https://matrix.datadialect.cz/_tuwunel/oidc/account" | grep -i content-security</code> — unrelated pages keep <code>form-action 'self'</code>.</li>
-      <li><code class="status">[]</code> <code>curl -s "https://matrix.datadialect.cz/_tuwunel/oidc/_complete?oidc_req_id=$RID&amp;loginToken=bogus" | head -c 200</code> — twice in a row: both responses are HTML, and the second is <em>not</em> <code>M_NOT_FOUND</code>.</li>
-      <li><code class="status">[]</code> <code>kubectl --context OCI -n kube-system logs -l app.kubernetes.io/name=ingress-nginx --since=15m | grep _tuwunel/oidc/token</code> — a token exchange exists, which never happened before this plan.</li>
+      <li><code class="status">[x]</code> <code>cargo test --workspace</code> — every unit and integration test passes, including the new CSP and retry coverage.</li>
+      <li><code class="status">[x]</code> <code>cargo clippy --workspace --all-targets -- -D warnings</code> — no new lints from the added helpers.</li>
+      <li><code class="status">[x]</code> <code>cargo fmt --all --check</code> — formatting matches CI.</li>
+      <li><code class="status">[x]</code> <code>curl -sD- -o/dev/null "https://matrix.datadialect.cz/_tuwunel/oidc/native?oidc_req_id=$RID&amp;view=login" | grep -i content-security</code> — the live sign-in page advertises the widened <code>form-action</code> for a live <code>$RID</code>.</li>
+      <li><code class="status">[x]</code> <code>curl -sLD- -o/dev/null "https://matrix.datadialect.cz/_tuwunel/oidc/account" | grep -i content-security</code> — follow the account redirect; the resulting unrelated page keeps <code>form-action 'self'</code>.</li>
+      <li><code class="status">[x]</code> <code>curl -s "https://matrix.datadialect.cz/_tuwunel/oidc/_complete?oidc_req_id=$RID&amp;loginToken=bogus" | head -c 200</code> — twice in a row: both responses are HTML, and the second is <em>not</em> <code>M_NOT_FOUND</code>.</li>
+      <li><code class="status">[x]</code> <code>kubectl --context OCI -n kube-system logs -l app.kubernetes.io/name=ingress-nginx --since=15m --tail=-1 | grep _tuwunel/oidc/token</code> — a token exchange exists, which never happened before this plan.</li>
     </ul>
     <div class="table-scroll">
       <table>
@@ -534,7 +534,7 @@ th { background: var(--code-bg); }
         <tr><td>Token exchange</td><td><code>grep "POST /_tuwunel/oidc/token"</code> over one attempt</td><td>Exactly 1, status 200</td></tr>
         <tr><td>Retry after a wrong password</td><td>Mistype once, then sign in correctly on the same page</td><td>Second attempt succeeds; no <code>404</code></td></tr>
         <tr><td>No JSON shown to a human</td><td>Force an error on <code>_complete</code> and <code>authorize</code> in a browser</td><td><code>text/html</code> page with a start-over link</td></tr>
-        <tr><td>Other browsers unaffected</td><td>Firefox and Element X against the same server</td><td>Sign-in still succeeds</td></tr>
+        <tr><td>Other browsers unaffected</td><td>Firefox and Playwright WebKit against the same server</td><td>Sign-in still succeeds</td></tr>
         <tr><td>Hardening preserved</td><td>Any non-OIDC HTML response</td><td><code>form-action 'self'</code>, unchanged</td></tr>
       </table>
     </div>
@@ -559,7 +559,7 @@ th { background: var(--code-bg); }
 
     <details>
       <summary>Can two concurrent completions still race for one authorization request?</summary>
-      <p class="qa-answer">In principle yes: peek is not atomic with take, so two simultaneous <code>_complete</code> calls could both peek before either takes. Phase 2 narrows the window by consuming immediately before issuing the code and treating a failed take as "already completed", which means at most one code is issued in practice. Closing it fully needs a compare-and-delete the current <code>Map</code> API does not expose. The residual risk is small — an attacker would need a second valid, unexpired, single-use login token for the same request inside the same few milliseconds — but it should be recorded rather than assumed away.</p>
+      <p class="qa-answer">No. The production-readiness review reproduced the race deterministically, so <code>take_auth_request</code> now holds a per-request mutex across the database peek and remove. A 32-contender regression that took one enlarged request 24 times before the fix records exactly one successful consumer afterward; the authorization-code issuance path therefore has a single winner without requiring a new compare-and-delete map primitive.</p>
     </details>
 
     <details>
@@ -654,6 +654,14 @@ GET  /_complete?oidc_req_id=Vuhe…&amp;loginToken=bogus   404  Unknown or expir
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-09-01 — Final digest deployed and verified in Chromium, Firefox, and WebKit</summary>
+      <p>Fork CI run <code>33451800790</code> published commit <code>83609e4b</code> as <code>ghcr.io/tom130/tuwunel:oidc-native-login-csp-form-action@sha256:f06c48dec7e17d0ff65667ebe8208b629ce66dea32684808963106eaf97887f6</code>. GitOps commit <code>beaf095</code> reconciled that exact digest; Helm release v33 became Ready and the replacement pod reported 1/1 Ready. Headless Chrome 148 passed both a single-submit sign-in and a wrong-then-correct password retry with token and sync status 200 and zero CSP violations. Firefox 151 and Playwright WebKit 26.5 (the available Safari-engine substitute) each rendered a signed-in Element session; ingress recorded one <code>_complete</code> 307 and one token 200 for each. A fresh unconsumed request returned the scoped Element <code>form-action</code>, the account page retained <code>form-action 'self'</code>, and two bogus completion attempts both returned safe HTML 403 pages rather than consuming the request. The live log commands now specify <code>--tail=-1</code>, because <code>kubectl logs</code> defaults to ten lines per pod when a label selector is used. Because the fork workflow uses the raw ref name as an OCI tag and slash-containing branch names are invalid tags, publication used the equivalent slash-free branch ref; the feature branch itself remains <code>fix/oidc-native-login-csp-form-action</code>.</p>
+    </details>
+    <details open>
+      <summary>2026-09-01 — Review made authorization-request consumption atomic</summary>
+      <p>The final production-readiness review found that the database read and remove inside <code>take_auth_request</code> were not atomic: 32 simultaneous consumers could take one deliberately enlarged request 24 times. A per-request <code>MutexMap</code>, matching the existing device-grant locking pattern, now serializes that critical section. The same regression records exactly one successful consumer after the fix, preserving retryability before token validation without allowing concurrent completions to mint multiple authorization codes.</p>
+    </details>
     <details open>
       <summary>2026-09-01 — The self-contained OAuth regression stays in <code>native_auth</code></summary>
       <p><code>src/main/tests/oauth_request_token.rs</code> is an opt-in external-provider probe that skips without environment credentials. The deterministic cross-origin flow therefore extends its sibling <code>src/main/tests/native_auth.rs</code>, where it registers a client and drives <code>authorize</code> → native page → credential submit → <code>_complete</code> against isolated storage. The existing router comment already records the Chromium redirect-chain rule after Phase 1 moved the shared CSP constant into <code>tuwunel_core</code>.</p>
