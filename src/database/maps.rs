@@ -191,7 +191,9 @@ pub(super) static MAPS: &[Descriptor] = &[
 	},
 	Descriptor {
 		name: "oidccode_authsession",
-		..descriptor::RANDOM_SMALL
+		// Dead after AUTH_CODE_LIFETIME (10m); FIFO reclaim is file-granular.
+		ttl: 60 * 60 * 24,
+		..descriptor::RANDOM_SMALL_CACHE
 	},
 	Descriptor {
 		name: "oidcdevice_userdeviceid",
@@ -213,7 +215,9 @@ pub(super) static MAPS: &[Descriptor] = &[
 	},
 	Descriptor {
 		name: "oidcreqid_authrequest",
-		..descriptor::RANDOM_SMALL
+		// Dead after AUTH_REQUEST_LIFETIME (10m); FIFO reclaim is file-granular.
+		ttl: 60 * 60 * 24,
+		..descriptor::RANDOM_SMALL_CACHE
 	},
 	Descriptor {
 		name: "onetimekeyid_onetimekeys",

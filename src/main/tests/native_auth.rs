@@ -290,6 +290,28 @@ async fn assert_auth_request_storage(
 		return Err!("unexpected expired-request message: {expired_message}");
 	}
 
+	if oidc
+		.take_auth_request("native-expired-test")
+		.await
+		.is_ok()
+	{
+		return Err!("expired authorization request was taken successfully");
+	}
+	let purged_error = match oidc
+		.peek_auth_request("native-expired-test")
+		.await
+	{
+		| Ok(_) => return Err!("expired authorization request remained after failed take"),
+		| Err(error) => error,
+	};
+	let purged_message = match purged_error {
+		| Error::Request(_, message, _) => message,
+		| other => return Err!("unexpected purged-request error: {other}"),
+	};
+	if purged_message != "Unknown or expired authorization request" {
+		return Err!("unexpected purged-request message: {purged_message}");
+	}
+
 	Ok(())
 }
 

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan: OIDC Security-Review Hardening</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #16212e;
+  --muted: #5b6b7d;
+  --line: #dde3ea;
+  --accent: #4338ca;
+  --accent-soft: #e6e4fa;
+  --warn: #b45309;
+  --warn-soft: #fdf1e0;
+  --ok: #15803d;
+  --ok-soft: #e5f4e9;
+  --bad: #b91c1c;
+  --code-bg: #eef1f5;
+  --mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: "Inter", -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #10161d;
+    --surface: #18212b;
+    --ink: #e4eaf1;
+    --muted: #93a3b5;
+    --line: #2a3644;
+    --accent: #a5b4fc;
+    --accent-soft: #1e2145;
+    --warn: #e0a04a;
+    --warn-soft: #33270f;
+    --ok: #4ade80;
+    --ok-soft: #10291a;
+    --bad: #f87171;
+    --code-bg: #202b37;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.6;
+  font-size: 16px;
+}
+main { max-width: 980px; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+h1 { font-size: 1.9rem; line-height: 1.25; letter-spacing: -0.02em; margin: 0 0 0.75rem; }
+h2 {
+  font-size: 1.35rem; letter-spacing: -0.01em; margin: 3rem 0 1rem;
+  padding-bottom: 0.4rem; border-bottom: 2px solid var(--accent);
+}
+h3 { font-size: 1.1rem; margin: 1.8rem 0 0.6rem; }
+h4 { font-size: 0.98rem; margin: 1.5rem 0 0.5rem; color: var(--accent); }
+p { margin: 0.6rem 0; }
+a { color: var(--accent); }
+code {
+  font-family: var(--mono); font-size: 0.85em;
+  background: var(--code-bg); padding: 0.12em 0.35em; border-radius: 4px;
+}
+pre {
+  background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.9rem 1.1rem; overflow-x: auto; font-size: 0.82rem; line-height: 1.55;
+}
+pre code { background: none; padding: 0; }
+figure { margin: 2rem 0; text-align: center; }
+figure img { max-width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+figure svg {
+  max-width: 100%; height: auto; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px;
+}
+.dlabel { font-family: var(--mono); font-size: 13px; fill: var(--muted); }
+.dlabel-strong { font-family: var(--mono); font-size: 14px; font-weight: 700; fill: var(--ink); }
+figcaption { font-size: 0.85rem; color: var(--muted); margin-top: 0.6rem; }
+details.meta {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; margin: 1rem 0 2rem; font-size: 0.88rem;
+}
+details.meta summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+details.meta dl { display: grid; grid-template-columns: 9rem 1fr; gap: 0.25rem 1rem; margin: 0.8rem 0 0.3rem; }
+details.meta dt { font-weight: 600; color: var(--muted); }
+details.meta dd { margin: 0; font-family: var(--mono); font-size: 0.82rem; overflow-wrap: anywhere; }
+section { margin-bottom: 1rem; }
+.tag {
+  display: inline-block; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.05em; padding: 0.1em 0.55em; border-radius: 999px; margin-right: 0.4em;
+}
+.tag.existing { background: var(--accent-soft); color: var(--accent); }
+.tag.new { background: var(--ok-soft); color: var(--ok); }
+.files ul { list-style: none; padding-left: 0; }
+.files li { padding: 0.3rem 0; border-bottom: 1px dashed var(--line); font-size: 0.92rem; }
+.phase {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 1.2rem 1.6rem 1.6rem; margin: 1.6rem 0;
+}
+.phase h3 { margin-top: 0.2rem; }
+code.status { color: var(--warn); font-weight: 700; background: var(--warn-soft); }
+ul.checklist { list-style: none; padding-left: 0.2rem; }
+ul.checklist li { padding: 0.28rem 0; font-size: 0.94rem; }
+.loop {
+  background: var(--warn-soft); border-left: 4px solid var(--warn);
+  padding: 0.7rem 1rem; border-radius: 6px; margin-top: 1.2rem; font-size: 0.92rem;
+}
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.88rem; }
+th, td { border: 1px solid var(--line); padding: 0.45rem 0.7rem; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+.evidence {
+  background: var(--accent-soft); border-left: 4px solid var(--accent);
+  padding: 0.7rem 1rem; border-radius: 6px; margin: 1rem 0; font-size: 0.92rem;
+}
+.rejected {
+  background: var(--surface); border: 1px dashed var(--line); border-radius: 8px;
+  padding: 0.8rem 1.1rem; margin: 0.8rem 0; font-size: 0.92rem;
+}
+.kpi { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+.table-scroll { overflow-x: auto; }
+#questionables details, #amendments details {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+  padding: 0.6rem 1rem; margin: 0.8rem 0; font-size: 0.92rem;
+}
+#questionables summary, #amendments summary { cursor: pointer; font-weight: 600; }
+.qa-answer { margin: 0.5rem 0 0.2rem; }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- ===== HEADER + UPDATABLE METADATA ===== -->
+  <header>
+    <h1>Plan: OIDC security-review hardening — bounded storage, single-use codes, CSP regressions</h1>
+    <details class="meta">
+      <summary>Metadata</summary>
+      <dl>
+        <dt>created</dt>      <dd>2026-09-01T08:37:48Z</dd>
+        <dt>modified</dt>     <dd>2026-09-01T08:37:48Z</dd>
+        <dt>commits</dt>      <dd>—</dd>
+        <dt>agent name</dt>   <dd>claude-fable-5 (planf3 / create-plan)</dd>
+        <dt>session id</dt>   <dd>884be352-da0f-4650-85f3-173e85a8239e</dd>
+        <dt>back refs</dt>    <dd>plans/oidc-native-login-csp-form-action.html</dd>
+        <dt>forward refs</dt> <dd>—</dd>
+      </dl>
+    </details>
+  </header>
+
+  <!-- Hero figure — synced to the :root visual identity. -->
+  <figure>
+    <img src="oidc-security-hardening-followups/hero.png" alt="Architecture diagram: the OIDC flow authorize → native login → _complete → token, with locked take and locked exchange arrows into the auth requests and auth codes tables inside a RocksDB FIFO ttl 24h container">
+    <figcaption>The four hardening follow-ups at a glance: bounded RocksDB retention, serialized code exchange, and two CSP regression tests locking the fixed behavior down.</figcaption>
+  </figure>
+
+  <!-- ===== PURPOSE / PROBLEM / SOLUTION ===== -->
+  <section id="purpose">
+    <h2>Purpose</h2>
+    <p>Close every <em>Important</em> finding from the 2026-09-01 security review of the OIDC native-login CSP series (<code>4fc8dd90..e6e4a5da</code>), plus the cheap hardening minors that live in the same files. Acceptance bar: <span class="kpi">exactly 1</span> of <span class="kpi">32</span> concurrent <code>exchange_auth_code</code> contenders succeeds; an expired authorization request is <span class="kpi">deleted</span> by its own failed take (a later peek reports <em>unknown</em>, not <em>expired</em>); both OIDC ephemeral tables carry a <span class="kpi">24 h</span> FIFO TTL and a <span class="kpi">64 MB</span> size cap; the widened CSP on the failed-submit re-render and the <code>html_layer</code> handler-wins precedence are each pinned by a test; all suites stay green (<span class="kpi">31+</span> unit tests in <code>tuwunel_api oidc</code>, <span class="kpi">1</span> integration test in <code>native_auth</code>, plus the new router tests). Out of scope: rendering the requesting client's identity on the sign-in page (a consent-UX design change deserving its own plan), rate limits on the GET browser routes, and any change to token or grant semantics beyond serializing consumption.</p>
+  </section>
+
+  <section id="problem">
+    <h2>Problem</h2>
+    <p>The CSP <code>form-action</code> fix series shipped correct and live-verified, but the review found the same defect classes it fixed still open one layer away, and the fixed behavior unprotected against regression. Four problems, in descending severity: <strong>(1)</strong> <code>oidcreqid_authrequest</code> rows are never deleted — the new <code>take_auth_request</code> propagates <code>peek</code>'s expiry error <em>before</em> its <code>remove</code>, abandoned requests (the common case: user closes the tab) are never touched again, and the table's <code>RANDOM_SMALL</code> descriptor gets only the inherited 21-day <code>set_ttl</code>, which under universal compaction merely schedules old files for compaction and <em>deletes nothing</em>. <code>/authorize</code> is unauthenticated and its <code>oidc_rc_*</code> throttle is a no-op unless configured, so the table is attacker-growable without bound. <code>oidccode_authsession</code> has the identical retention hole for abandoned codes. <strong>(2)</strong> <code>exchange_auth_code</code> still does get&nbsp;→&nbsp;remove with no per-code lock: two concurrent <code>POST /token</code> with the same code can both redeem it and mint two sessions — the exact race this series closed for auth requests with <code>auth_request_locks</code>, and RFC 6749 §4.1.2 requires single-use codes. <strong>(3)</strong> The widened CSP on the failed-submit re-render (wrong password → form re-rendered) is load-bearing — without it the user's <em>second, correct</em> submit is CSP-blocked in Chromium, the precise UX the series exists to fix — and no test asserts it. <strong>(4)</strong> The design leans on <code>html_layer()</code>'s <code>.entry().or_insert()</code> letting the handler's CSP win, but the integration harness builds <code>tuwunel_api::router::build</code> without the router layer stack, so a "tidy" to <code>.insert()</code> would silently revert every OIDC page to the strict policy with no failing test — the exact regression class (header cleanup, <code>9bace37e</code>) that caused the original incident.</p>
+    <div class="evidence">
+      <strong>Codebase verification (2026-09-01, this session):</strong>
+      <code>src/service/oauth/server/auth.rs:123-130</code> — <code>take_auth_request</code> holds <code>auth_request_locks</code> but <code>peek…?</code> at line 125 returns before the <code>remove</code> at line 127 when the row is expired.
+      <code>src/database/maps.rs:214-217</code> — <code>oidcreqid_authrequest</code> uses bare <code>RANDOM_SMALL</code>; <code>maps.rs:192-195</code> — <code>oidccode_authsession</code> likewise; the device-grant tables at <code>maps.rs:200-209</code> use <code>RANDOM_SMALL_CACHE</code> + <code>ttl: 60*60*24</code>.
+      <code>src/database/engine/descriptor.rs:90</code> — <code>BASE</code> ttl is 21 days, applied via <code>opts.set_ttl</code> (<code>cf_opts.rs:43</code>): compaction scheduling only for non-FIFO styles; only the FIFO <code>_CACHE</code> templates actually drop aged files.
+      <code>src/service/oauth/server/auth.rs:141-150</code> — <code>exchange_auth_code</code> get→remove, no lock; <code>server.rs:37-41</code> — <code>device_locks</code> / <code>auth_request_locks</code> precedent fields.
+      <code>src/api/oidc/native.rs:198-206</code> — failed-submit re-render passes <code>form_action</code> through; asserted nowhere.
+      <code>src/router/layers.rs:264-270</code> — <code>.entry().or_insert()</code> precedence; <code>src/main/tests/native_auth.rs:448-463</code> — harness composes only the API router, so the layer never runs in that suite.
+    </div>
+    <figure>
+      <img src="oidc-security-hardening-followups/problem.png" alt="Two-lane problem diagram: expired requests flow never-deleted into the unbounded oidcreqid_authrequest table; token A and token B both pass get code before remove, and both succeed">
+      <figcaption>The two live defects: unbounded retention of ephemeral OIDC rows, and the auth-code double-spend window between <code>get</code> and <code>remove</code>.</figcaption>
+    </figure>
+  </section>
+
+  <section id="solution">
+    <h2>Solution</h2>
+    <p>Apply the codebase's own proven patterns rather than inventing new machinery. <strong>Retention:</strong> switch both ephemeral OIDC tables to <code>RANDOM_SMALL_CACHE</code> with <code>ttl: 60*60*24</code> — FIFO compaction genuinely deletes aged files, and <code>limit_size: 64 MB</code> (inherited from the template) turns the attacker-growable table into a bounded ring; the in-place universal→FIFO conversion of an existing column family shipped before in this repo (<code>92bef7a3</code> converted <code>mediaid_lazy</code>). Complement the coarse file-level TTL with a precise purge: <code>take_auth_request</code> removes the row even when <code>peek</code> fails, so an expired request dies at its own consumption attempt. <strong>Single-use codes:</strong> add <code>auth_code_locks: MutexMap&lt;String, ()&gt;</code> to <code>Server</code> and lock the code at the top of <code>exchange_auth_code</code> — a line-for-line application of the series' own <code>auth_request_locks</code> pattern; <code>MutexMap</code> auto-removes entries on guard drop, so attacker-chosen code keys cannot accumulate. <strong>Regression tests:</strong> assert the exact widened CSP header on a wrong-password re-render inside the existing cross-origin integration flow (the always-on brute-force floor allows a 60-token burst, so one extra failed POST is safe), and pin <code>html_layer</code>'s handler-wins precedence with unit tests in the existing <code>src/router/layers/tests.rs</code>, driven by <code>futures::executor::block_on</code> (already a router dependency — no new dev-deps). <strong>Polish:</strong> flip <code>form_action_source</code> from denylist to allowlist (http/https origins plus dotted reverse-DNS schemes, mirroring DCR's classification), build the widened CSP from the <code>TUWUNEL_CSP</code> parts instead of a silent string-replace, show the "link expired" page only for actual <code>NotFound</code> peek failures, and document the deliberate divergence between the two origin extractors.</p>
+    <figure>
+      <img src="oidc-security-hardening-followups/solution.png" alt="After-state diagram: a serialized lock → read → remove chain yielding exactly once, a bounded auth-tables cylinder with FIFO ttl 24h and limit 64MB, and a CSP regression tests shield beneath both">
+      <figcaption>After: both consumption paths serialized behind per-key locks, both tables bounded by FIFO TTL, and the CSP behavior fenced by tests at both layers.</figcaption>
+    </figure>
+  </section>
+
+  <!-- ===== RELEVANT FILES ===== -->
+  <section id="files" class="files">
+    <h2>Relevant Files</h2>
+
+    <h3>Existing Files</h3>
+    <ul>
+      <li><span class="tag existing">existing</span> <code>src/database/maps.rs</code> — column-family schema; <code>oidccode_authsession</code> at 192-195 and <code>oidcreqid_authrequest</code> at 214-217 move to <code>RANDOM_SMALL_CACHE</code> + 24 h ttl (device-grant precedent at 200-209).</li>
+      <li><span class="tag existing">existing</span> <code>src/service/oauth/server.rs</code> — <code>Server</code> struct; add <code>auth_code_locks</code> beside <code>device_locks</code>/<code>auth_request_locks</code> (37-41) and init in <code>build</code> (79-80).</li>
+      <li><span class="tag existing">existing</span> <code>src/service/oauth/server/auth.rs</code> — <code>take_auth_request</code> (123-130) gains the unconditional purge; <code>exchange_auth_code</code> (133-150) gains the per-code lock. <code>AUTH_REQUEST_LIFETIME</code>/<code>AUTH_CODE_LIFETIME</code> are both 10 min (66-67), far under the 24 h ttl.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/native.rs</code> — <code>form_action_source</code> (73-82) flips to allowlist; <code>expired_authorization_response</code> (211-217) gains the <code>NotFound</code> gate; unit tests in the same file extend.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/account.rs</code> — <code>account_html_response_with_form_action</code> (382-409) builds the policy from <code>TUWUNEL_CSP</code> parts; <code>redirect_origin</code> (430-442) gets the divergence doc comment.</li>
+      <li><span class="tag existing">existing</span> <code>src/api/oidc/account/tests.rs</code> — existing exact-header CSP tests keep the new construction honest; extend for allowlist cases.</li>
+      <li><span class="tag existing">existing</span> <code>src/router/layers.rs</code> + <code>src/router/layers/tests.rs</code> — <code>html_layer</code> (251-275) precedence pinned by new unit tests beside the existing layer-branch tests.</li>
+      <li><span class="tag existing">existing</span> <code>src/main/tests/native_auth.rs</code> — integration suite; extend <code>assert_auth_request_storage</code> (246-294), clone <code>assert_concurrent_auth_request_take</code> (110-153) for code exchange, extend <code>assert_cross_origin_authorization_flow</code> (155-225) with the failed-submit CSP assertion.</li>
+      <li><span class="tag existing">existing</span> <code>src/core/utils/html.rs</code> — <code>TUWUNEL_CSP</code> parts array (7-16); read-only, the new policy construction consumes it.</li>
+      <li><span class="tag existing">existing</span> <code>plans/oidc-native-login-csp-form-action.html</code> — parent plan; receives an amendment correcting its phase-2/3 testing checklist commands and a forward ref to this plan.</li>
+    </ul>
+
+    <h3>New Files</h3>
+    <ul>
+      <li><span class="tag new">new</span> <code>plans/oidc-security-hardening-followups/</code> — generated diagram images for this plan; no new source files, every code change lands in an existing module.</li>
+    </ul>
+  </section>
+
+  <!-- ===== IMPLEMENTATION PHASES ===== -->
+  <section id="phases">
+    <h2>Implementation Phases</h2>
+    <p><strong>IMPORTANT:</strong> Execute every phase and task step by step, in order, top to bottom.</p>
+    <p>Status markers: <code>[]</code> idle · <code>[wip]</code> in progress · <code>[x]</code> complete · <code>[f]</code> failed. All start as <code>[]</code>; the executing workflow updates them as it works.</p>
+
+    <div class="phase">
+      <h3><code class="status">[x]</code> Phase 1: Bounded retention for the OIDC ephemeral tables</h3>
+      <p>Give <code>oidcreqid_authrequest</code> and <code>oidccode_authsession</code> the same FIFO-cache retention the device-grant tables already have, and make a failed take purge its own expired row. Closes review finding Important&nbsp;1.</p>
+
+      <h4>1. Switch both descriptors to the FIFO cache template</h4>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> In <code>src/database/maps.rs</code>, change <code>oidccode_authsession</code> (192-195) and <code>oidcreqid_authrequest</code> (214-217) to the CACHE template with an explanatory ttl comment, following the <code>mediaid_lazy</code> style from <code>92bef7a3</code>:</li>
+      </ul>
+      <pre><code>Descriptor {
+	name: "oidccode_authsession",
+	ttl: 60 * 60 * 24, // dead after AUTH_CODE_LIFETIME (10m); FIFO reclaim is file-granular
+	..descriptor::RANDOM_SMALL_CACHE
+},
+…
+Descriptor {
+	name: "oidcreqid_authrequest",
+	ttl: 60 * 60 * 24, // dead after AUTH_REQUEST_LIFETIME (10m); FIFO reclaim is file-granular
+	..descriptor::RANDOM_SMALL_CACHE
+},</code></pre>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> Do not tighten ttl below 24 h: FIFO TTL is file-granularity, the 64 MB <code>limit_size</code> already bounds abuse, and matching the device-grant tables keeps one convention. Both application lifetimes (10 min) enforce actual expiry; the descriptor only reclaims storage.</li>
+      </ul>
+
+      <h4>2. Purge the expired row inside <code>take_auth_request</code></h4>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> In <code>src/service/oauth/server/auth.rs</code>, stop propagating <code>peek</code>'s error around the <code>remove</code> — bind the result, remove unconditionally under the held lock, then return it:</li>
+      </ul>
+      <pre><code>pub async fn take_auth_request(&amp;self, req_id: &amp;str) -&gt; Result&lt;AuthRequest&gt; {
+	let _request_lock = self.auth_request_locks.lock(req_id).await;
+	let request = self.peek_auth_request(req_id).await;
+
+	// Purge unconditionally: an expired row can never be redeemed, and the
+	// FIFO ttl only reclaims it at file granularity, so it dies at its own
+	// consumption attempt. Removing an absent key is a no-op.
+	self.db.oidcreqid_authrequest.remove(req_id);
+
+	request
+}</code></pre>
+
+      <h4>3. Testing Strategy</h4>
+      <p>Service-level assertions in the existing integration test distinguish <em>deleted</em> from <em>still present</em> through the two distinct peek error messages: "Unknown or expired authorization request" (row absent) vs "Authorization request has expired" (row present, expired). Extend <code>assert_auth_request_storage</code> in <code>src/main/tests/native_auth.rs</code> directly after its existing expired-peek block (277-291): call <code>take_auth_request("native-expired-test")</code>, require it to fail, then require a follow-up <code>peek</code> to report the <em>unknown</em> message — proving the take deleted the row. The descriptor change itself is exercised by the whole suite running against a real RocksDB: the column family opens under the new FIFO options in a fresh database.</p>
+      <ul class="checklist">
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel --test native_auth</code> — fresh DB opens with the FIFO descriptors; expired take purges its row; all pre-existing storage semantics hold.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api oidc</code> — no API-layer behavior drift.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 2: Serialize authorization-code exchange</h3>
+      <p>Make authorization codes single-use under concurrency (RFC 6749 §4.1.2, OAuth Security BCP) by applying the series' own <code>MutexMap</code> pattern to <code>exchange_auth_code</code>. Closes review finding Important&nbsp;2.</p>
+
+      <h4>1. Add the per-code lock map to <code>Server</code></h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>src/service/oauth/server.rs</code>, add the field beside <code>auth_request_locks</code> (41) with a doc comment in the house style, and init it in <code>build</code> beside the others (79-80):</li>
+      </ul>
+      <pre><code>/// Serializes the read-check-consume of an authorization code so concurrent
+/// token requests cannot each redeem the same single-use code (RFC 6749
+/// §4.1.2).
+auth_code_locks: MutexMap&lt;String, ()&gt;,
+…
+auth_code_locks: MutexMap::new(),</code></pre>
+
+      <h4>2. Lock the code for the whole read-check-consume</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>src/service/oauth/server/auth.rs</code>, take the guard as the first statement of <code>exchange_auth_code</code>, before the <code>get</code>; keep the existing remove-before-expiry-check ordering (an expired code is still purged by its redemption attempt):</li>
+      </ul>
+      <pre><code>pub async fn exchange_auth_code(&amp;self, code: &amp;str, …) -&gt; Result&lt;AuthCodeSession&gt; {
+	let _code_lock = self.auth_code_locks.lock(code).await;
+	let session: AuthCodeSession = self.db.oidccode_authsession.get(code).await…</code></pre>
+
+      <h4>3. Testing Strategy</h4>
+      <p>Clone the proven 32-contender barrier pattern from <code>assert_concurrent_auth_request_take</code> (<code>native_auth.rs:110-153</code>) as a new <code>assert_concurrent_auth_code_exchange</code>, wired into <code>native_round_trip</code> after the existing concurrency check. Widen the race window the same way: build the code from an <code>AuthRequest</code> whose <code>redirect_uri</code> carries a 4&nbsp;MB payload (the session clones that field), so every contender observes the value before any remove lands. Contenders call <code>exchange_auth_code(&amp;code, "native-test-client", &amp;large_redirect_uri, None, false)</code> — client and redirect must match the session, and <code>test_auth_request</code> carries no PKCE challenge, so <code>require_pkce: false</code> takes the challenge-less Ok path. Require <span class="kpi">exactly 1</span> success. Before the fix this test fails with multiple winners; after, it must be stable across repeated runs.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel --test native_auth</code> — exactly one of 32 concurrent exchanges succeeds; full flow still green.</li>
+        <li><code class="status">[]</code> Re-run the suite at least twice more — the race assertion must not flake.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 3: CSP regression tests at both layers</h3>
+      <p>Fence the two untested load-bearing behaviors: the widened CSP on the failed-submit re-render, and <code>html_layer</code>'s handler-wins header precedence. No production code changes in this phase — if either new test fails, that is a real defect to fix before proceeding. Closes review findings Important&nbsp;3 and Important&nbsp;4.</p>
+
+      <h4>1. Assert the widened CSP on the wrong-password re-render</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>assert_cross_origin_authorization_flow</code> (<code>native_auth.rs:155-225</code>), between the GET-page CSP assertion and the correct-credentials POST, submit the same form with a wrong password and assert: status <code>FORBIDDEN</code>; the <em>exact</em> widened CSP header (same byte-for-byte string the GET assertion uses, ending <code>form-action 'self' https://element-cross-origin.example;base-uri 'none'</code>); the body contains <code>Invalid username or password</code> and still contains <code>&lt;form</code>. The always-on device rate limiter allows a 60-token burst per IP (<code>DEVICE_RC_BURST</code>, <code>src/service/oauth/mod.rs:91</code>), so the extra POST cannot trip it.</li>
+        <li><code class="status">[]</code> Let the flow proceed to the existing correct-password POST unchanged — its success doubles as the retry-preservation proof: the failed submit did not consume the authorization request.</li>
+      </ul>
+
+      <h4>2. Pin <code>html_layer</code> precedence in the router crate</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>src/router/layers/tests.rs</code>, add three tests beside the existing layer-branch tests, driving the layered service with <code>futures::executor::block_on</code> + <code>tower::ServiceExt::oneshot</code> over a <code>tower::service_fn</code> handler (<code>futures</code>, <code>tower</code>, <code>http</code> are already router dependencies — add no dev-deps):</li>
+        <li><code class="status">[]</code> <em>handler CSP wins:</em> a <code>text/html</code> response that already carries <code>Content-Security-Policy: form-action 'self' https://client.example</code> passes through with that exact value preserved and <code>X-Frame-Options: DENY</code> inserted.</li>
+        <li><code class="status">[]</code> <em>default applied:</em> a <code>text/html</code> response with no CSP gets exactly <code>TUWUNEL_CSP_VALUE</code>.</li>
+        <li><code class="status">[]</code> <em>non-HTML untouched:</em> an <code>application/json</code> response gets neither header.</li>
+      </ul>
+      <pre><code>#[test]
+fn html_layer_preserves_handler_csp() {
+	let svc = super::html_layer().layer(tower::service_fn(|_req: http::Request&lt;()&gt;| async {
+		Ok::&lt;_, std::convert::Infallible&gt;(
+			http::Response::builder()
+				.header(header::CONTENT_TYPE, "text/html")
+				.header(header::CONTENT_SECURITY_POLICY, "form-action 'self' https://client.example")
+				.body(())
+				.expect("static test response must build"),
+		)
+	}));
+
+	let response = futures::executor::block_on(svc.oneshot(http::Request::new(())))
+		.expect("infallible service");
+
+	assert_eq!(
+		response.headers()[header::CONTENT_SECURITY_POLICY],
+		"form-action 'self' https://client.example"
+	);
+	assert_eq!(response.headers()[header::X_FRAME_OPTIONS], "DENY");
+}</code></pre>
+
+      <h4>3. Testing Strategy</h4>
+      <p>These <em>are</em> the tests; the strategy is proving they bite. For the layer tests, temporarily flip <code>.or_insert</code> to <code>.insert</code>-equivalent locally (or comment the <code>entry</code> guard) and watch the handler-CSP test fail, then restore. For the re-render test, temporarily drop the <code>form_action</code> argument at <code>native.rs:206</code> and watch the new assertion fail, then restore. Record in the commit message that both mutations were verified to fail.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_router</code> — three new layer tests pass; existing branch tests unaffected.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel --test native_auth</code> — extended cross-origin flow passes with the failed-submit assertion.</li>
+        <li><code class="status">[]</code> Both mutation checks performed and reverted — each new test demonstrated to fail against the regression it guards.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 4: Hardening polish in the touched modules</h3>
+      <p>The review's cheap minors that materially harden or de-fragilize the same files: allowlist scheme classification, structural CSP construction, honest error copy, and the divergence documentation. Closes review minors 1-5.</p>
+
+      <h4>1. Flip <code>form_action_source</code> to an allowlist</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>src/api/oidc/native.rs:73-82</code>, replace the <code>javascript</code>/<code>data</code> denylist with the DCR-mirroring classification — http/https origins, or dotted reverse-DNS private-use schemes (<code>is_reverse_dns</code> with no base is <code>scheme.contains('.')</code>, <code>registration.rs:218-221</code>); everything else (<code>blob:</code>, <code>file:</code>, <code>ftp:</code>…) yields <code>None</code> and falls back to the strict policy:</li>
+      </ul>
+      <pre><code>let source = match url.scheme() {
+	| "http" | "https" =&gt; url.origin().ascii_serialization(),
+	// Mirror DCR's redirect classification (validate_redirect_uri): only
+	// dotted reverse-DNS private-use schemes qualify as a CSP source.
+	| scheme if scheme.contains('.') =&gt; format!("{scheme}:"),
+	| _ =&gt; return None,
+};</code></pre>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Extend <code>form_action_accepts_safe_origins_and_rejects_header_injection</code> (<code>native.rs:687-700</code>) with <code>blob:</code> and <code>file:///etc/passwd</code> → <code>None</code>; keep <code>io.element.android:</code> → <code>Some</code>.</li>
+      </ul>
+
+      <h4>2. Build the widened policy from the <code>TUWUNEL_CSP</code> parts</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>account_html_response_with_form_action</code> (<code>account.rs:394-400</code>), replace the silent string-replace with a map over <code>TUWUNEL_CSP</code> so a reworded or reordered policy can never silently drop the widening; keep the <code>HeaderValue::try_from</code> fail-closed fallback (401-402) unchanged:</li>
+      </ul>
+      <pre><code>let policy = extra_source.map_or_else(
+	|| TUWUNEL_CSP_VALUE.to_owned(),
+	|source| {
+		TUWUNEL_CSP
+			.iter()
+			.map(|directive| match directive.strip_prefix("form-action") {
+				| Some(rest) =&gt; format!("form-action{rest} {source}"),
+				| None =&gt; (*directive).to_owned(),
+			})
+			.collect::&lt;Vec&lt;_&gt;&gt;()
+			.join(";")
+	},
+);</code></pre>
+      <ul class="checklist">
+        <li><code class="status">[]</code> The existing exact-header tests (<code>account/tests.rs</code> <code>authorization_csp_only_widens_form_action</code>, plus both integration CSP assertions) must pass byte-for-byte unchanged — they are the proof the construction is equivalent.</li>
+      </ul>
+
+      <h4>3. Gate the "link expired" copy on an actual <code>NotFound</code></h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> In <code>expired_authorization_response</code> (<code>native.rs:211-217</code>): both real peek failures are <code>Request(NotFound(…))</code>, while a missing OIDC server surfaces as <code>Request(Unrecognized(…))</code> (<code>oauth/mod.rs:77-81</code>). Render the expired page only for the <code>NotFound</code> kind; delegate everything else to <code>account_error_response(error)</code>, which already shows the sanitized message. Verify the exact <code>Error::Request</code> variant shape against <code>tuwunel_core::Error</code> when implementing (the integration suite matches it as <code>Error::Request(_, message, _)</code>).</li>
+        <li><code class="status">[]</code> Add a unit test: a <code>NotFound</code> error renders the expired page; an <code>Unrecognized</code> error renders its sanitized message and not the "Sign-in link expired" heading.</li>
+      </ul>
+
+      <h4>4. Document the deliberate divergences</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Doc comments on <code>form_action_source</code> (<code>native.rs</code>) and <code>redirect_origin</code> (<code>account.rs:430-442</code>) naming each other and stating why they differ: link target (http/https only — a clickable "Start over" must never be a custom scheme) vs CSP source (custom app schemes allowed — the form posts to a validated native callback).</li>
+        <li><code class="status">[]</code> Doc comments on <code>native_get_route</code>, <code>native_submit_route</code> (<code>native.rs</code>) and <code>complete_route</code> (<code>complete.rs</code>): browser navigation targets return <code>Response</code> and render every failure as HTML — never add a <code>Result</code>-returning route here, or errors regress to JSON (the parent plan's recorded loose thread).</li>
+      </ul>
+
+      <h4>5. Amend the parent plan</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Append an amendment entry to <code>plans/oidc-native-login-csp-form-action.html</code> correcting its phase-2/3 testing checklists: the retry/storage behaviors are tested by <code>cargo test -p tuwunel --test native_auth</code> (in <code>src/main/tests/native_auth.rs</code>), not <code>-p tuwunel_api complete</code> / <code>-p tuwunel_service oauth</code>. Append this plan to its <code>forward refs</code> metadata list (append-only; keep existing entries).</li>
+      </ul>
+
+      <h4>6. Testing Strategy</h4>
+      <p>Unit tests in the touched crates carry this phase; the byte-for-byte CSP assertions at both the unit and integration layers prove the parts-based construction changed nothing observable. Run the full trio to catch cross-crate drift.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — allowlist, policy-construction, and error-copy tests pass; every pre-existing CSP byte-string unchanged.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel --test native_auth</code> — integration CSP assertions still byte-identical.</li>
+        <li><code class="status">[]</code> <code>cargo test -p tuwunel_router</code> — layer tests still green.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+
+    <div class="phase">
+      <h3><code class="status">[]</code> Phase 5: Deploy and verify live</h3>
+      <p>The FIFO conversion of two existing column families is the one change with a runtime risk profile beyond the test suite: the live database reopens its existing CFs under new compaction options. The in-place precedent (<code>mediaid_lazy</code>, <code>92bef7a3</code>) shipped cleanly, and the worst-case rollback is trivial — revert the descriptor; the rows are 10-minute ephemera, losing them logs users out of nothing. Verify on the production deployment (tuwunel on the OCI k8s cluster via the oci-flux GitOps repo, <code>kubectl --context OCI</code>).</p>
+
+      <h4>1. Ship and watch startup</h4>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Merge to <code>main</code> and let fork CI publish the OCI image; roll it out through the oci-flux repo as usual.</li>
+        <li><code class="status">[]</code> Watch pod logs across the restart (<code>kubectl --context OCI logs -f …</code>): the database must open every column family cleanly — no <code>Invalid argument</code> or FIFO/compaction errors naming <code>oidcreqid_authrequest</code> or <code>oidccode_authsession</code>.</li>
+      </ul>
+
+      <h4>2. Testing Strategy</h4>
+      <p>A live end-to-end native login is the acceptance test: it exercises authorize → native page → submit → <code>_complete</code> → token exchange across the converted tables and the serialized exchange path. Perform it from a real client (Element) against the production homeserver, wrong password first, then correct — mirroring the integration flow.</p>
+      <ul class="checklist">
+        <li><code class="status">[]</code> Live native login with one failed attempt then a successful retry completes end-to-end in a Chromium browser (the CSP-sensitive engine).</li>
+        <li><code class="status">[]</code> Startup logs recorded clean; note the verification (date, image tag, log excerpt) in this plan's Amendments.</li>
+      </ul>
+      <div class="loop">
+        🔁 <strong>Do not exit this phase until every box above is checked.</strong>
+        If any command fails, fix the cause and re-run — loop until all pass.
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== GLOBAL VALIDATION ===== -->
+  <section id="validation">
+    <h2>Validation Commands</h2>
+    <p>Execute these commands to validate the entire plan is complete:</p>
+    <ul class="checklist">
+      <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — all OIDC unit tests (31 pre-existing + this plan's additions) pass.</li>
+      <li><code class="status">[]</code> <code>cargo test -p tuwunel_router</code> — layer-branch and new <code>html_layer</code> precedence tests pass.</li>
+      <li><code class="status">[]</code> <code>cargo test -p tuwunel --test native_auth</code> — full integration flow: FIFO descriptors, purged expired take, 1-of-32 exchange, failed-submit CSP, cross-origin completion.</li>
+      <li><code class="status">[]</code> <code>cargo clippy -p tuwunel_database -p tuwunel_service -p tuwunel_api -p tuwunel_router --all-targets</code> — no new lints in the touched crates.</li>
+      <li><code class="status">[]</code> <code>cargo fmt --all -- --check</code> — formatting clean (CI enforces via the <code>fmt</code> bake target).</li>
+    </ul>
+    <div class="table-scroll">
+      <table>
+        <tr><th>Check</th><th>Query / method</th><th>Acceptance bar</th></tr>
+        <tr><td>Live DB reopen under FIFO descriptors</td><td><code>kubectl --context OCI logs</code> across the rollout restart</td><td>Every column family opens; zero errors naming either converted table</td></tr>
+        <tr><td>Live native login, failure-then-retry</td><td>Element against the production homeserver, Chromium</td><td>Wrong password re-renders the form (no CSP block), correct retry completes sign-in</td></tr>
+      </table>
+    </div>
+    <div class="loop">
+      🔁 <strong>The plan is not complete until every box is checked and every command passes. If for some reason a step is not possible to complete, mark it with [f] and move on if possible.</strong>
+    </div>
+  </section>
+
+  <!-- ===== NOTES ===== -->
+  <section id="notes">
+    <h2>Notes</h2>
+
+    <h3>Provenance</h3>
+    <p>This plan operationalizes the 2026-09-01 security-focused code review of the OIDC native-login CSP series (<code>4fc8dd90..e6e4a5da</code>): Important findings 1-4 map to Phases 1-3; review minors 1-5 map to Phase 4; the review's remaining items are deliberately deferred (below). The review's verdict on the shipped series was "ready / no revert" — nothing here is a fix to broken behavior, all of it is closing adjacent gaps the series exposed to scrutiny.</p>
+
+    <h3>Why FIFO conversion is safe enough</h3>
+    <div class="evidence">
+      <strong>In-repo precedent:</strong> commit <code>92bef7a3</code> converted the existing, populated <code>mediaid_lazy</code> column family from <code>RANDOM_SMALL</code> to <code>RANDOM_SMALL_CACHE</code> in place and shipped in a release. The engine applies descriptor options on open (<code>cf_opts.rs</code>); no migration step exists or was needed. Residual risk is RocksDB rejecting FIFO over files previously compacted into lower levels — precisely what Phase 5's startup-log watch covers, and why rollback (revert the two descriptor lines) is recorded as trivially safe: the tables hold only 10-minute ephemera.
+    </div>
+    <div class="rejected">
+      <strong>Rejected: a periodic sweep task.</strong> An in-process iterator deleting expired rows would need new task plumbing, a wake interval, and its own tests — to approximate what FIFO TTL provides in two descriptor lines with an existing convention. More code, same guarantee, worse precedent-fit.
+    </div>
+    <div class="rejected">
+      <strong>Rejected: a RocksDB compaction filter.</strong> Entry-precise expiry at the engine layer for two KB-scale tables is disproportionate machinery; nothing else in the codebase uses one.
+    </div>
+    <div class="rejected">
+      <strong>Rejected: purging inside <code>peek_auth_request</code>.</strong> Peek is deliberately read-only — it runs on every GET of the login page and inside <code>_complete</code>'s pre-check. Giving it a write side effect would blur the peek/take contract the parent series just established; the take-side purge plus FIFO TTL covers both the touched-when-expired and never-touched-again cases.
+    </div>
+    <div class="rejected">
+      <strong>Rejected: tightening <code>ttl</code> to ~1 h.</strong> FIFO TTL deletes whole aged files, not rows, so a tight ttl buys little precision; 24 h matches the device-grant tables and keeps a single convention. The 64 MB <code>limit_size</code> is the actual abuse bound — at ~1 KB per request that is a ring of ~65 k in-flight rows, far beyond any legitimate concurrent login load.
+    </div>
+
+    <h3>FIFO early-eviction tradeoff</h3>
+    <p>Under FIFO compaction, exceeding <code>limit_size</code> evicts oldest files even before ttl. For these tables that is the desired failure mode: under a request-spray attack the oldest (attacker's) rows die first, and a legitimate user evicted mid-login simply restarts the flow — the same UX as an expired request, on a page that already handles it.</p>
+
+    <h3>Build-environment gotchas (from the review session, same machine)</h3>
+    <p>The repo's default nix devshell produced host build-script binaries that segfault under a sandboxed harness; the <code>dynamic</code> devshell worked, with <code>LD_LIBRARY_PATH</code> pointing at the nix-provided rocksdb/jemalloc shared libraries. When running as an agent, use an isolated <code>CARGO_TARGET_DIR</code> rather than the repo's shared <code>target/</code> — a sandboxed build that dies can leave poisoned build-script fingerprints a later developer build would reuse. The two test binaries take minutes to link cold; run them in the foreground with a generous timeout rather than backgrounding and losing the run.</p>
+
+    <h3>Deliberately deferred (candidates for their own plans)</h3>
+    <ul>
+      <li><strong>Client identity on the sign-in page.</strong> With open dynamic client registration and no consent step, the login page never shows which client receives the code. Rendering <code>client_name</code> + redirect origin (MAS-style) is the standard phishing mitigation — but it is consent-UX design work with i18n and layout questions, not a mechanical hardening fix. Own plan.</li>
+      <li><strong>Rate limits on <code>GET /native</code> and <code>GET /_complete</code>.</strong> Unthrottled DB-read + render; low risk (no state mutation, no secrets), and the right shape may be a shared browser-route limiter rather than two more ad-hoc buckets.</li>
+      <li><strong>Unifying the origin extractors.</strong> Phase 4 documents the <code>form_action_source</code> / <code>redirect_origin</code> divergence; folding them into one policy-flagged helper is optional follow-up refactoring once both are fenced by tests.</li>
+    </ul>
+  </section>
+
+  <!-- ===== AMENDMENTS ===== -->
+  <section id="amendments">
+    <h2>Amendments</h2>
+  </section>
+
+</main>
+</body>
+</html>

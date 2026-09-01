@@ -122,11 +122,14 @@ pub async fn peek_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
 #[implement(super::Server)]
 pub async fn take_auth_request(&self, req_id: &str) -> Result<AuthRequest> {
 	let _request_lock = self.auth_request_locks.lock(req_id).await;
-	let request = self.peek_auth_request(req_id).await?;
+	let request = self.peek_auth_request(req_id).await;
 
+	// Purge unconditionally: an expired row can never be redeemed, and the
+	// FIFO ttl only reclaims it at file granularity, so it dies at its own
+	// consumption attempt. Removing an absent key is a no-op.
 	self.db.oidcreqid_authrequest.remove(req_id);
 
-	Ok(request)
+	request
 }
 
 #[implement(super::Server)]
