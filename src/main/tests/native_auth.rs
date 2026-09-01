@@ -245,10 +245,24 @@ async fn assert_cross_origin_authorization_flow(services: &Arc<Services>) -> Res
 		.expect("the native redirect URI must be valid");
 	let response = api_request(services, request).await;
 	assert_eq!(response.status(), StatusCode::OK);
-	assert_eq!(
-		response.headers()[CONTENT_SECURITY_POLICY],
-		"default-src 'none';script-src 'self';style-src 'self';frame-ancestors 'none';form-action 'self' https://element-cross-origin.example;base-uri 'none'"
-	);
+	let expected_csp = "default-src 'none';script-src 'self';style-src 'self';frame-ancestors \
+	                    'none';form-action 'self' \
+	                    https://element-cross-origin.example;base-uri 'none'";
+	assert_eq!(response.headers()[CONTENT_SECURITY_POLICY], expected_csp);
+
+	let request = Request::post("/_tuwunel/oidc/native")
+		.header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+		.header("x-forwarded-for", "127.0.0.1")
+		.body(Body::from(format!(
+			"oidc_req_id={req_id}&username=nativealice&password=wrong-password"
+		)))
+		.expect("the invalid native credential submission must be valid");
+	let response = api_request(services, request).await;
+	assert_eq!(response.status(), StatusCode::FORBIDDEN);
+	assert_eq!(response.headers()[CONTENT_SECURITY_POLICY], expected_csp);
+	let body = response_text(response).await;
+	assert!(body.contains("Invalid username or password"));
+	assert!(body.contains("<form"));
 
 	let request = Request::post("/_tuwunel/oidc/native")
 		.header(CONTENT_TYPE, "application/x-www-form-urlencoded")

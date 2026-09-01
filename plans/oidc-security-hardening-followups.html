@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-09-01T08:37:48Z</dd>
-        <dt>modified</dt>     <dd>2026-09-01T09:10:00Z</dd>
-        <dt>commits</dt>      <dd><code>09429045</code></dd>
+        <dt>modified</dt>     <dd>2026-09-01T09:32:17Z</dd>
+        <dt>commits</dt>      <dd><code>09429045</code>, <code>5437a0dd</code></dd>
         <dt>agent name</dt>   <dd>claude-fable-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>884be352-da0f-4650-85f3-173e85a8239e</dd>
         <dt>back refs</dt>    <dd>plans/oidc-native-login-csp-form-action.html</dd>
@@ -178,7 +178,7 @@ th { background: var(--code-bg); }
 
   <section id="solution">
     <h2>Solution</h2>
-    <p>Apply the codebase's own proven patterns rather than inventing new machinery. <strong>Retention:</strong> switch both ephemeral OIDC tables to <code>RANDOM_SMALL_CACHE</code> with <code>ttl: 60*60*24</code> — FIFO compaction genuinely deletes aged files, and <code>limit_size: 64 MB</code> (inherited from the template) turns the attacker-growable table into a bounded ring; the in-place universal→FIFO conversion of an existing column family shipped before in this repo (<code>92bef7a3</code> converted <code>mediaid_lazy</code>). Complement the coarse file-level TTL with a precise purge: <code>take_auth_request</code> removes the row even when <code>peek</code> fails, so an expired request dies at its own consumption attempt. <strong>Single-use codes:</strong> add <code>auth_code_locks: MutexMap&lt;String, ()&gt;</code> to <code>Server</code> and lock the code at the top of <code>exchange_auth_code</code> — a line-for-line application of the series' own <code>auth_request_locks</code> pattern; <code>MutexMap</code> auto-removes entries on guard drop, so attacker-chosen code keys cannot accumulate. <strong>Regression tests:</strong> assert the exact widened CSP header on a wrong-password re-render inside the existing cross-origin integration flow (the always-on brute-force floor allows a 60-token burst, so one extra failed POST is safe), and pin <code>html_layer</code>'s handler-wins precedence with unit tests in the existing <code>src/router/layers/tests.rs</code>, driven by <code>futures::executor::block_on</code> (already a router dependency — no new dev-deps). <strong>Polish:</strong> flip <code>form_action_source</code> from denylist to allowlist (http/https origins plus dotted reverse-DNS schemes, mirroring DCR's classification), build the widened CSP from the <code>TUWUNEL_CSP</code> parts instead of a silent string-replace, show the "link expired" page only for actual <code>NotFound</code> peek failures, and document the deliberate divergence between the two origin extractors.</p>
+    <p>Apply the codebase's own proven patterns rather than inventing new machinery. <strong>Retention:</strong> switch both ephemeral OIDC tables to <code>RANDOM_SMALL_CACHE</code> with <code>ttl: 60*60*24</code> — FIFO compaction genuinely deletes aged files, and <code>limit_size: 64 MB</code> (inherited from the template) turns the attacker-growable table into a bounded ring; the in-place universal→FIFO conversion of an existing column family shipped before in this repo (<code>92bef7a3</code> converted <code>mediaid_lazy</code>). Complement the coarse file-level TTL with a precise purge: <code>take_auth_request</code> removes the row even when <code>peek</code> fails, so an expired request dies at its own consumption attempt. <strong>Single-use codes:</strong> add <code>auth_code_locks: MutexMap&lt;String, ()&gt;</code> to <code>Server</code> and lock the code at the top of <code>exchange_auth_code</code> — a line-for-line application of the series' own <code>auth_request_locks</code> pattern; <code>MutexMap</code> auto-removes entries on guard drop, so attacker-chosen code keys cannot accumulate. <strong>Regression tests:</strong> assert the exact widened CSP header on a wrong-password re-render inside the existing cross-origin integration flow (the always-on brute-force floor allows a 60-token burst, so one extra failed POST is safe), and pin <code>html_layer</code>'s handler-wins precedence with unit tests in the existing <code>src/router/layers/tests.rs</code>, driven by the router crate's existing Tokio test runtime (no new dev-deps). <strong>Polish:</strong> flip <code>form_action_source</code> from denylist to allowlist (http/https origins plus dotted reverse-DNS schemes, mirroring DCR's classification), build the widened CSP from the <code>TUWUNEL_CSP</code> parts instead of a silent string-replace, show the "link expired" page only for actual <code>NotFound</code> peek failures, and document the deliberate divergence between the two origin extractors.</p>
     <figure>
       <img src="oidc-security-hardening-followups/solution.png" alt="After-state diagram: a serialized lock → read → remove chain yielding exactly once, a bounded auth-tables cylinder with FIFO ttl 24h and limit 64MB, and a CSP regression tests shield beneath both">
       <figcaption>After: both consumption paths serialized behind per-key locks, both tables bounded by FIFO TTL, and the CSP behavior fenced by tests at both layers.</figcaption>
@@ -302,25 +302,25 @@ auth_code_locks: MutexMap::new(),</code></pre>
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 3: CSP regression tests at both layers</h3>
+      <h3><code class="status">[x]</code> Phase 3: CSP regression tests at both layers</h3>
       <p>Fence the two untested load-bearing behaviors: the widened CSP on the failed-submit re-render, and <code>html_layer</code>'s handler-wins header precedence. No production code changes in this phase — if either new test fails, that is a real defect to fix before proceeding. Closes review findings Important&nbsp;3 and Important&nbsp;4.</p>
 
       <h4>1. Assert the widened CSP on the wrong-password re-render</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>assert_cross_origin_authorization_flow</code> (<code>native_auth.rs:155-225</code>), between the GET-page CSP assertion and the correct-credentials POST, submit the same form with a wrong password and assert: status <code>FORBIDDEN</code>; the <em>exact</em> widened CSP header (same byte-for-byte string the GET assertion uses, ending <code>form-action 'self' https://element-cross-origin.example;base-uri 'none'</code>); the body contains <code>Invalid username or password</code> and still contains <code>&lt;form</code>. The always-on device rate limiter allows a 60-token burst per IP (<code>DEVICE_RC_BURST</code>, <code>src/service/oauth/mod.rs:91</code>), so the extra POST cannot trip it.</li>
-        <li><code class="status">[]</code> Let the flow proceed to the existing correct-password POST unchanged — its success doubles as the retry-preservation proof: the failed submit did not consume the authorization request.</li>
+        <li><code class="status">[x]</code> In <code>assert_cross_origin_authorization_flow</code> (<code>native_auth.rs:155-225</code>), between the GET-page CSP assertion and the correct-credentials POST, submit the same form with a wrong password and assert: status <code>FORBIDDEN</code>; the <em>exact</em> widened CSP header (same byte-for-byte string the GET assertion uses, ending <code>form-action 'self' https://element-cross-origin.example;base-uri 'none'</code>); the body contains <code>Invalid username or password</code> and still contains <code>&lt;form</code>. The always-on device rate limiter allows a 60-token burst per IP (<code>DEVICE_RC_BURST</code>, <code>src/service/oauth/mod.rs:91</code>), so the extra POST cannot trip it.</li>
+        <li><code class="status">[x]</code> Let the flow proceed to the existing correct-password POST unchanged — its success doubles as the retry-preservation proof: the failed submit did not consume the authorization request.</li>
       </ul>
 
       <h4>2. Pin <code>html_layer</code> precedence in the router crate</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> In <code>src/router/layers/tests.rs</code>, add three tests beside the existing layer-branch tests, driving the layered service with <code>futures::executor::block_on</code> + <code>tower::ServiceExt::oneshot</code> over a <code>tower::service_fn</code> handler (<code>futures</code>, <code>tower</code>, <code>http</code> are already router dependencies — add no dev-deps):</li>
-        <li><code class="status">[]</code> <em>handler CSP wins:</em> a <code>text/html</code> response that already carries <code>Content-Security-Policy: form-action 'self' https://client.example</code> passes through with that exact value preserved and <code>X-Frame-Options: DENY</code> inserted.</li>
-        <li><code class="status">[]</code> <em>default applied:</em> a <code>text/html</code> response with no CSP gets exactly <code>TUWUNEL_CSP_VALUE</code>.</li>
-        <li><code class="status">[]</code> <em>non-HTML untouched:</em> an <code>application/json</code> response gets neither header.</li>
+        <li><code class="status">[x]</code> In <code>src/router/layers/tests.rs</code>, add three <code>#[tokio::test]</code> tests beside the existing layer-branch tests, driving the layered service with <code>tower::ServiceExt::oneshot</code> over a <code>tower::service_fn</code> handler (<code>tokio</code>, <code>tower</code>, and <code>http</code> are already router dependencies — add no dev-deps):</li>
+        <li><code class="status">[x]</code> <em>handler CSP wins:</em> a <code>text/html</code> response that already carries <code>Content-Security-Policy: form-action 'self' https://client.example</code> passes through with that exact value preserved and <code>X-Frame-Options: DENY</code> inserted.</li>
+        <li><code class="status">[x]</code> <em>default applied:</em> a <code>text/html</code> response with no CSP gets exactly <code>TUWUNEL_CSP_VALUE</code>.</li>
+        <li><code class="status">[x]</code> <em>non-HTML untouched:</em> an <code>application/json</code> response gets neither header.</li>
       </ul>
-      <pre><code>#[test]
-fn html_layer_preserves_handler_csp() {
-	let svc = super::html_layer().layer(tower::service_fn(|_req: http::Request&lt;()&gt;| async {
+      <pre><code>#[tokio::test]
+async fn html_layer_preserves_handler_csp() {
+	let svc = super::html_layer().layer(tower::service_fn(async |_req: http::Request&lt;()&gt;| {
 		Ok::&lt;_, std::convert::Infallible&gt;(
 			http::Response::builder()
 				.header(header::CONTENT_TYPE, "text/html")
@@ -330,7 +330,7 @@ fn html_layer_preserves_handler_csp() {
 		)
 	}));
 
-	let response = futures::executor::block_on(svc.oneshot(http::Request::new(())))
+	let response = svc.oneshot(http::Request::new(())).await
 		.expect("infallible service");
 
 	assert_eq!(
@@ -343,9 +343,9 @@ fn html_layer_preserves_handler_csp() {
       <h4>3. Testing Strategy</h4>
       <p>These <em>are</em> the tests; the strategy is proving they bite. For the layer tests, temporarily flip <code>.or_insert</code> to <code>.insert</code>-equivalent locally (or comment the <code>entry</code> guard) and watch the handler-CSP test fail, then restore. For the re-render test, temporarily drop the <code>form_action</code> argument at <code>native.rs:206</code> and watch the new assertion fail, then restore. Record in the commit message that both mutations were verified to fail.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel_router</code> — three new layer tests pass; existing branch tests unaffected.</li>
-        <li><code class="status">[]</code> <code>cargo test -p tuwunel --test native_auth</code> — extended cross-origin flow passes with the failed-submit assertion.</li>
-        <li><code class="status">[]</code> Both mutation checks performed and reverted — each new test demonstrated to fail against the regression it guards.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel_router</code> — three new layer tests pass; existing branch tests unaffected.</li>
+        <li><code class="status">[x]</code> <code>cargo test -p tuwunel --test native_auth</code> — extended cross-origin flow passes with the failed-submit assertion.</li>
+        <li><code class="status">[x]</code> Both mutation checks performed and reverted — each new test demonstrated to fail against the regression it guards.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -510,6 +510,10 @@ fn html_layer_preserves_handler_csp() {
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-09-01 — Phase 3 router test executor correction</summary>
+      <p>The router crate's workspace <code>futures</code> dependency disables default features and does not enable the <code>executor</code> feature, so the planned <code>futures::executor::block_on</code> test driver does not compile. The crate already depends on Tokio with its test macro and runtime features enabled. The three layer tests therefore use <code>#[tokio::test]</code> and <code>.await</code>, preserving the planned behavior and adding no dependency.</p>
+    </details>
   </section>
 
 </main>
