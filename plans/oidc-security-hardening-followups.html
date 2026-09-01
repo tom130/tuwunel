@@ -136,8 +136,8 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-09-01T08:37:48Z</dd>
-        <dt>modified</dt>     <dd>2026-09-01T09:45:24Z</dd>
-        <dt>commits</dt>      <dd><code>09429045</code>, <code>5437a0dd</code>, <code>37afceb8</code></dd>
+        <dt>modified</dt>     <dd>2026-09-01T09:56:02Z</dd>
+        <dt>commits</dt>      <dd><code>09429045</code>, <code>5437a0dd</code>, <code>37afceb8</code>, <code>556c2a1b</code></dd>
         <dt>agent name</dt>   <dd>claude-fable-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>884be352-da0f-4650-85f3-173e85a8239e</dd>
         <dt>back refs</dt>    <dd>plans/oidc-native-login-csp-form-action.html</dd>
@@ -424,7 +424,7 @@ async fn html_layer_preserves_handler_csp() {
     </div>
 
     <div class="phase">
-      <h3><code class="status">[]</code> Phase 5: Deploy and verify live</h3>
+      <h3><code class="status">[wip]</code> Phase 5: Deploy and verify live</h3>
       <p>The FIFO conversion of two existing column families is the one change with a runtime risk profile beyond the test suite: the live database reopens its existing CFs under new compaction options. The in-place precedent (<code>mediaid_lazy</code>, <code>92bef7a3</code>) shipped cleanly, and the worst-case rollback is trivial — revert the descriptor; the rows are 10-minute ephemera, losing them logs users out of nothing. Verify on the production deployment (tuwunel on the OCI k8s cluster via the oci-flux GitOps repo, <code>kubectl --context OCI</code>).</p>
 
       <h4>1. Ship and watch startup</h4>
@@ -451,11 +451,11 @@ async fn html_layer_preserves_handler_csp() {
     <h2>Validation Commands</h2>
     <p>Execute these commands to validate the entire plan is complete:</p>
     <ul class="checklist">
-      <li><code class="status">[]</code> <code>cargo test -p tuwunel_api oidc</code> — all OIDC unit tests (31 pre-existing + this plan's additions) pass.</li>
-      <li><code class="status">[]</code> <code>cargo test -p tuwunel_router</code> — layer-branch and new <code>html_layer</code> precedence tests pass.</li>
-      <li><code class="status">[]</code> <code>cargo test -p tuwunel --test native_auth</code> — full integration flow: FIFO descriptors, purged expired take, 1-of-32 exchange, failed-submit CSP, cross-origin completion.</li>
-      <li><code class="status">[]</code> <code>cargo clippy -p tuwunel_database -p tuwunel_service -p tuwunel_api -p tuwunel_router --all-targets</code> — no new lints in the touched crates.</li>
-      <li><code class="status">[]</code> <code>cargo fmt --all -- --check</code> — formatting clean (CI enforces via the <code>fmt</code> bake target).</li>
+      <li><code class="status">[x]</code> <code>cargo test -p tuwunel_api oidc</code> — all OIDC unit tests (31 pre-existing + this plan's additions) pass.</li>
+      <li><code class="status">[x]</code> <code>cargo test -p tuwunel_router</code> — layer-branch and new <code>html_layer</code> precedence tests pass.</li>
+      <li><code class="status">[x]</code> <code>cargo test -p tuwunel --test native_auth</code> — full integration flow: FIFO descriptors, purged expired take, 1-of-32 exchange, failed-submit CSP, cross-origin completion.</li>
+      <li><code class="status">[x]</code> <code>cargo clippy -p tuwunel_database -p tuwunel_service -p tuwunel_api -p tuwunel_router --all-targets</code> — no new lints in the touched crates.</li>
+      <li><code class="status">[x]</code> <code>cargo fmt --all -- --check</code> — formatting clean (CI enforces via the <code>fmt</code> bake target).</li>
     </ul>
     <div class="table-scroll">
       <table>
@@ -510,6 +510,10 @@ async fn html_layer_preserves_handler_csp() {
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-09-01 — Pre-deployment production-readiness review</summary>
+      <p>A dedicated review of <code>e6e4a5da..556c2a1b</code> against this plan found no Critical, Important, or Minor issues. It checked the FIFO descriptor migration against the shipped <code>mediaid_lazy</code> precedent, both keyed-lock lifetimes and fail-closed consumption order, browser CSP construction and precedence, error-kind gating, test mutation evidence, and documentation. The implementation is ready to merge subject to the global validation gate and live rollout checks below.</p>
+    </details>
     <details open>
       <summary>2026-09-01 — Phase 3 router test executor correction</summary>
       <p>The router crate's workspace <code>futures</code> dependency disables default features and does not enable the <code>executor</code> feature, so the planned <code>futures::executor::block_on</code> test driver does not compile. The crate already depends on Tokio with its test macro and runtime features enabled. The three layer tests therefore use <code>#[tokio::test]</code> and <code>.await</code>, preserving the planned behavior and adding no dependency.</p>
