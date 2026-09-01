@@ -136,10 +136,12 @@ th { background: var(--code-bg); }
       <summary>Metadata</summary>
       <dl>
         <dt>created</dt>      <dd>2026-09-01T08:37:48Z</dd>
-        <dt>modified</dt>     <dd>2026-09-01T09:56:02Z</dd>
-        <dt>commits</dt>      <dd><code>09429045</code>, <code>5437a0dd</code>, <code>37afceb8</code>, <code>556c2a1b</code></dd>
+        <dt>modified</dt>     <dd>2026-09-01T11:15:10Z</dd>
+        <dt>commits</dt>      <dd><code>09429045</code>, <code>5437a0dd</code>, <code>37afceb8</code>, <code>556c2a1b</code>, <code>fb52387b</code></dd>
         <dt>agent name</dt>   <dd>claude-fable-5 (planf3 / create-plan)</dd>
         <dt>session id</dt>   <dd>884be352-da0f-4650-85f3-173e85a8239e</dd>
+        <dt>executing agent</dt><dd>Codex (GPT-5)</dd>
+        <dt>execution session</dt><dd>not exposed by this runtime</dd>
         <dt>back refs</dt>    <dd>plans/oidc-native-login-csp-form-action.html</dd>
         <dt>forward refs</dt> <dd>—</dd>
       </dl>
@@ -424,20 +426,20 @@ async fn html_layer_preserves_handler_csp() {
     </div>
 
     <div class="phase">
-      <h3><code class="status">[wip]</code> Phase 5: Deploy and verify live</h3>
+      <h3><code class="status">[x]</code> Phase 5: Deploy and verify live</h3>
       <p>The FIFO conversion of two existing column families is the one change with a runtime risk profile beyond the test suite: the live database reopens its existing CFs under new compaction options. The in-place precedent (<code>mediaid_lazy</code>, <code>92bef7a3</code>) shipped cleanly, and the worst-case rollback is trivial — revert the descriptor; the rows are 10-minute ephemera, losing them logs users out of nothing. Verify on the production deployment (tuwunel on the OCI k8s cluster via the oci-flux GitOps repo, <code>kubectl --context OCI</code>).</p>
 
       <h4>1. Ship and watch startup</h4>
       <ul class="checklist">
-        <li><code class="status">[]</code> Merge to <code>main</code> and let fork CI publish the OCI image; roll it out through the oci-flux repo as usual.</li>
-        <li><code class="status">[]</code> Watch pod logs across the restart (<code>kubectl --context OCI logs -f …</code>): the database must open every column family cleanly — no <code>Invalid argument</code> or FIFO/compaction errors naming <code>oidcreqid_authrequest</code> or <code>oidccode_authsession</code>.</li>
+        <li><code class="status">[x]</code> Merge to <code>main</code> and let fork CI publish the OCI image; roll it out through the oci-flux repo as usual.</li>
+        <li><code class="status">[x]</code> Watch pod logs across the restart (<code>kubectl --context OCI logs -f …</code>): the database must open every column family cleanly — no <code>Invalid argument</code> or FIFO/compaction errors naming <code>oidcreqid_authrequest</code> or <code>oidccode_authsession</code>.</li>
       </ul>
 
       <h4>2. Testing Strategy</h4>
       <p>A live end-to-end native login is the acceptance test: it exercises authorize → native page → submit → <code>_complete</code> → token exchange across the converted tables and the serialized exchange path. Perform it from a real client (Element) against the production homeserver, wrong password first, then correct — mirroring the integration flow.</p>
       <ul class="checklist">
-        <li><code class="status">[]</code> Live native login with one failed attempt then a successful retry completes end-to-end in a Chromium browser (the CSP-sensitive engine).</li>
-        <li><code class="status">[]</code> Startup logs recorded clean; note the verification (date, image tag, log excerpt) in this plan's Amendments.</li>
+        <li><code class="status">[x]</code> Live native login with one failed attempt then a successful retry completes end-to-end in a Chromium browser (the CSP-sensitive engine).</li>
+        <li><code class="status">[x]</code> Startup logs recorded clean; note the verification (date, image tag, log excerpt) in this plan's Amendments.</li>
       </ul>
       <div class="loop">
         🔁 <strong>Do not exit this phase until every box above is checked.</strong>
@@ -510,6 +512,10 @@ async fn html_layer_preserves_handler_csp() {
   <!-- ===== AMENDMENTS ===== -->
   <section id="amendments">
     <h2>Amendments</h2>
+    <details open>
+      <summary>2026-09-01 — Live FIFO rollout and Chromium retry verified</summary>
+      <p>Fork CI run <code>33495072367</code> published main commit <code>fb52387b</code> as <code>ghcr.io/tom130/tuwunel:main@sha256:ba33e0b7db6e3d9549f0d654e964ba7caee3a5b4547db6de217724d12fb36d6b</code>. GitOps commit <code>4716b6f</code> reconciled that exact digest; Helm release v34 became Ready and replacement pod <code>tuwunel-datadialect-7449c59b6b-rg465</code> reported Ready with zero restarts. Its complete startup log contained five lines: <code>Opened database. columns=133 sequence=11105219 time=530.617365ms</code>, then <code>Listening on ["tcp:0.0.0.0:6167"]</code>, with zero invalid-argument, FIFO, compaction, <code>oidcreqid_authrequest</code>, or <code>oidccode_authsession</code> risk lines. Headless Chromium 148 drove the real Element client against production: the wrong-password submit returned HTML 403 with the form and exact widened CSP intact; the correct retry produced native POST 303, <code>_complete</code> 307, exactly one token 200, and sync 200 with zero CSP violations. Ingress independently recorded the same 403 → 303 → 307 → 200 sequence. The disposable account <code>@oidchardeningmtikkyf1:datadialect.cz</code> was self-deactivated immediately afterward with status 200.</p>
+    </details>
     <details open>
       <summary>2026-09-01 — Pre-deployment production-readiness review</summary>
       <p>A dedicated review of <code>e6e4a5da..556c2a1b</code> against this plan found no Critical, Important, or Minor issues. It checked the FIFO descriptor migration against the shipped <code>mediaid_lazy</code> precedent, both keyed-lock lifetimes and fail-closed consumption order, browser CSP construction and precedence, error-kind gating, test mutation evidence, and documentation. The implementation is ready to merge subject to the global validation gate and live rollout checks below.</p>
